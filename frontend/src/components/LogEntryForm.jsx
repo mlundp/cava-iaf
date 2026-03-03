@@ -111,12 +111,12 @@ export default function LogEntryForm({ onClose, onSaved }) {
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 20 }}>Log aktivitet</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#888' }}>×</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#0f172a' }}>Log aktivitet</h2>
+          <button onClick={onClose} style={closeBtnStyle}>×</button>
         </div>
 
-        {error && <p style={{ color: '#dc2626', fontSize: 14, margin: '0 0 12px' }}>{error}</p>}
+        {error && <p style={errorStyle}>{error}</p>}
 
         <form onSubmit={handleSubmit}>
           <label style={labelStyle}>
@@ -129,7 +129,7 @@ export default function LogEntryForm({ onClose, onSaved }) {
             />
           </label>
 
-          <label style={{ ...labelStyle, marginTop: 16, position: 'relative' }}>
+          <label style={{ ...labelStyle, marginTop: 18, position: 'relative' }}>
             Virksomhed *
             <div ref={dropdownRef} style={{ position: 'relative' }}>
               <input
@@ -154,13 +154,15 @@ export default function LogEntryForm({ onClose, onSaved }) {
                       key={c.id}
                       onClick={() => selectCompany(c)}
                       style={{
-                        padding: '8px 12px',
+                        padding: '9px 14px',
                         cursor: 'pointer',
                         fontSize: 14,
-                        backgroundColor: c.id === form.company_id ? '#f0f0f0' : '#fff',
+                        color: '#0f172a',
+                        backgroundColor: c.id === form.company_id ? '#f1f5f9' : '#fff',
+                        transition: 'background-color 0.1s ease',
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f5f5')}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = c.id === form.company_id ? '#f0f0f0' : '#fff')}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = c.id === form.company_id ? '#f1f5f9' : '#fff')}
                     >
                       {c.name}
                     </div>
@@ -171,7 +173,7 @@ export default function LogEntryForm({ onClose, onSaved }) {
           </label>
 
           {form.company_id && contacts.length > 0 && (
-            <label style={{ ...labelStyle, marginTop: 16 }}>
+            <label style={{ ...labelStyle, marginTop: 18 }}>
               Kontakt (valgfri)
               <select
                 value={form.contact_id}
@@ -186,33 +188,37 @@ export default function LogEntryForm({ onClose, onSaved }) {
             </label>
           )}
 
-          <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#555', marginBottom: 8 }}>Aktivitetstype *</div>
+          <div style={{ marginTop: 18 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>Aktivitetstype *</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {activityTypes.map((at) => (
-                <button
-                  key={at.key}
-                  type="button"
-                  onClick={() => setForm((prev) => ({ ...prev, activity_type: at.key }))}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: 20,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    border: form.activity_type === at.key ? '2px solid #1a1a2e' : '1px solid #ddd',
-                    backgroundColor: form.activity_type === at.key ? '#1a1a2e' : '#fff',
-                    color: form.activity_type === at.key ? '#fff' : '#555',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {at.label}
-                </button>
-              ))}
+              {activityTypes.map((at) => {
+                const isActive = form.activity_type === at.key;
+                return (
+                  <button
+                    key={at.key}
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, activity_type: at.key }))}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: 20,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      border: isActive ? '1px solid #6366f1' : '1px solid #e2e8f0',
+                      backgroundColor: isActive ? '#6366f1' : '#fff',
+                      color: isActive ? '#fff' : '#64748b',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {at.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <label style={{ ...labelStyle, marginTop: 16 }}>
+          <label style={{ ...labelStyle, marginTop: 18 }}>
             Note (valgfri)
             <textarea
               value={form.notes}
@@ -223,9 +229,9 @@ export default function LogEntryForm({ onClose, onSaved }) {
             />
           </label>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24, paddingTop: 20, borderTop: '1px solid #f1f5f9' }}>
             <button type="button" onClick={onClose} style={cancelBtnStyle}>Annuller</button>
-            <button type="submit" disabled={saving} style={saveBtnStyle}>
+            <button type="submit" disabled={saving} style={{ ...saveBtnStyle, opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Gemmer...' : 'Gem log'}
             </button>
           </div>
@@ -238,7 +244,8 @@ export default function LogEntryForm({ onClose, onSaved }) {
 const overlayStyle = {
   position: 'fixed',
   top: 0, left: 0, right: 0, bottom: 0,
-  backgroundColor: 'rgba(0,0,0,0.4)',
+  backgroundColor: 'rgba(15, 23, 42, 0.4)',
+  backdropFilter: 'blur(4px)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -247,13 +254,14 @@ const overlayStyle = {
 
 const modalStyle = {
   backgroundColor: '#fff',
-  borderRadius: 10,
+  borderRadius: 12,
   padding: 28,
   width: '100%',
   maxWidth: 520,
   maxHeight: '90vh',
   overflowY: 'auto',
-  boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+  boxShadow: '0 24px 48px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.08)',
+  border: '1px solid rgba(0,0,0,0.06)',
 };
 
 const labelStyle = {
@@ -261,17 +269,45 @@ const labelStyle = {
   flexDirection: 'column',
   fontSize: 13,
   fontWeight: 600,
-  color: '#555',
-  gap: 4,
+  color: '#374151',
+  gap: 6,
 };
 
 const inputStyle = {
-  padding: '9px 12px',
-  border: '1px solid #ddd',
-  borderRadius: 6,
+  padding: '10px 12px',
+  border: '1px solid #e2e8f0',
+  borderRadius: 8,
   fontSize: 14,
   outline: 'none',
   fontFamily: 'inherit',
+  color: '#0f172a',
+  backgroundColor: '#fff',
+  transition: 'border-color 0.15s ease',
+};
+
+const closeBtnStyle = {
+  background: 'none',
+  border: 'none',
+  fontSize: 20,
+  cursor: 'pointer',
+  color: '#94a3b8',
+  width: 32,
+  height: 32,
+  borderRadius: 8,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  transition: 'background-color 0.15s ease',
+};
+
+const errorStyle = {
+  color: '#dc2626',
+  fontSize: 13,
+  margin: '0 0 16px',
+  padding: '10px 14px',
+  backgroundColor: '#fef2f2',
+  borderRadius: 8,
+  border: '1px solid #fecaca',
 };
 
 const dropdownStyle = {
@@ -279,31 +315,38 @@ const dropdownStyle = {
   top: '100%',
   left: 0,
   right: 0,
+  marginTop: 4,
   backgroundColor: '#fff',
-  border: '1px solid #ddd',
-  borderRadius: 6,
+  border: '1px solid #e2e8f0',
+  borderRadius: 8,
   maxHeight: 200,
   overflowY: 'auto',
   zIndex: 10,
-  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+  boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
 };
 
 const cancelBtnStyle = {
-  padding: '10px 20px',
-  border: '1px solid #ddd',
-  borderRadius: 6,
+  padding: '10px 18px',
+  border: '1px solid #e2e8f0',
+  borderRadius: 8,
   cursor: 'pointer',
-  fontSize: 14,
+  fontSize: 13,
+  fontWeight: 600,
   backgroundColor: '#fff',
+  color: '#374151',
+  fontFamily: 'inherit',
+  transition: 'all 0.15s ease',
 };
 
 const saveBtnStyle = {
-  padding: '10px 20px',
+  padding: '10px 18px',
   border: 'none',
-  borderRadius: 6,
+  borderRadius: 8,
   cursor: 'pointer',
-  fontSize: 14,
+  fontSize: 13,
   fontWeight: 600,
-  backgroundColor: '#1a1a2e',
+  backgroundColor: '#6366f1',
   color: '#fff',
+  fontFamily: 'inherit',
+  transition: 'background-color 0.15s ease',
 };

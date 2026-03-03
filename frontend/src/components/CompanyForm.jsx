@@ -74,12 +74,14 @@ export default function CompanyForm({ company, onClose, onSaved }) {
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 20 }}>{isEdit ? 'Rediger virksomhed' : 'Tilføj virksomhed'}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#888' }}>×</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#0f172a' }}>
+            {isEdit ? 'Rediger virksomhed' : 'Tilføj virksomhed'}
+          </h2>
+          <button onClick={onClose} style={closeBtnStyle}>×</button>
         </div>
 
-        {error && <p style={{ color: '#dc2626', fontSize: 14, margin: '0 0 12px' }}>{error}</p>}
+        {error && <p style={errorStyle}>{error}</p>}
 
         <form onSubmit={handleSubmit}>
           <div style={fieldGrid}>
@@ -124,9 +126,9 @@ export default function CompanyForm({ company, onClose, onSaved }) {
             </label>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24, paddingTop: 20, borderTop: '1px solid #f1f5f9' }}>
             <button type="button" onClick={onClose} style={cancelBtnStyle}>Annuller</button>
-            <button type="submit" disabled={saving} style={saveBtnStyle}>
+            <button type="submit" disabled={saving} style={{ ...saveBtnStyle, opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Gemmer...' : isEdit ? 'Gem ændringer' : 'Opret'}
             </button>
           </div>
@@ -139,7 +141,8 @@ export default function CompanyForm({ company, onClose, onSaved }) {
 const overlayStyle = {
   position: 'fixed',
   top: 0, left: 0, right: 0, bottom: 0,
-  backgroundColor: 'rgba(0,0,0,0.4)',
+  backgroundColor: 'rgba(15, 23, 42, 0.4)',
+  backdropFilter: 'blur(4px)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -148,19 +151,20 @@ const overlayStyle = {
 
 const modalStyle = {
   backgroundColor: '#fff',
-  borderRadius: 10,
+  borderRadius: 12,
   padding: 28,
   width: '100%',
   maxWidth: 560,
   maxHeight: '90vh',
   overflowY: 'auto',
-  boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+  boxShadow: '0 24px 48px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.08)',
+  border: '1px solid rgba(0,0,0,0.06)',
 };
 
 const fieldGrid = {
   display: 'grid',
   gridTemplateColumns: '1fr 1fr',
-  gap: 16,
+  gap: 18,
 };
 
 const labelStyle = {
@@ -168,35 +172,69 @@ const labelStyle = {
   flexDirection: 'column',
   fontSize: 13,
   fontWeight: 600,
-  color: '#555',
-  gap: 4,
+  color: '#374151',
+  gap: 6,
 };
 
 const inputStyle = {
-  padding: '9px 12px',
-  border: '1px solid #ddd',
-  borderRadius: 6,
+  padding: '10px 12px',
+  border: '1px solid #e2e8f0',
+  borderRadius: 8,
   fontSize: 14,
   outline: 'none',
   fontFamily: 'inherit',
+  color: '#0f172a',
+  backgroundColor: '#fff',
+  transition: 'border-color 0.15s ease',
+};
+
+const closeBtnStyle = {
+  background: 'none',
+  border: 'none',
+  fontSize: 20,
+  cursor: 'pointer',
+  color: '#94a3b8',
+  width: 32,
+  height: 32,
+  borderRadius: 8,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  transition: 'background-color 0.15s ease',
+};
+
+const errorStyle = {
+  color: '#dc2626',
+  fontSize: 13,
+  margin: '0 0 16px',
+  padding: '10px 14px',
+  backgroundColor: '#fef2f2',
+  borderRadius: 8,
+  border: '1px solid #fecaca',
 };
 
 const cancelBtnStyle = {
-  padding: '10px 20px',
-  border: '1px solid #ddd',
-  borderRadius: 6,
+  padding: '10px 18px',
+  border: '1px solid #e2e8f0',
+  borderRadius: 8,
   cursor: 'pointer',
-  fontSize: 14,
+  fontSize: 13,
+  fontWeight: 600,
   backgroundColor: '#fff',
+  color: '#374151',
+  fontFamily: 'inherit',
+  transition: 'all 0.15s ease',
 };
 
 const saveBtnStyle = {
-  padding: '10px 20px',
+  padding: '10px 18px',
   border: 'none',
-  borderRadius: 6,
+  borderRadius: 8,
   cursor: 'pointer',
-  fontSize: 14,
+  fontSize: 13,
   fontWeight: 600,
-  backgroundColor: '#1a1a2e',
+  backgroundColor: '#6366f1',
   color: '#fff',
+  fontFamily: 'inherit',
+  transition: 'background-color 0.15s ease',
 };

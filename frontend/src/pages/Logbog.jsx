@@ -14,13 +14,13 @@ const activityLabels = {
 };
 
 const activityColors = {
-  called: { bg: '#dbeafe', color: '#2563eb' },
-  emailed: { bg: '#e0e7ff', color: '#4338ca' },
-  met: { bg: '#d1fae5', color: '#059669' },
-  no_answer: { bg: '#f3f4f6', color: '#6b7280' },
-  proposal_sent: { bg: '#fef3c7', color: '#d97706' },
-  contract_signed: { bg: '#d1fae5', color: '#047857' },
-  other: { bg: '#f3f4f6', color: '#374151' },
+  called: { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' },
+  emailed: { bg: '#eef2ff', color: '#4338ca', border: '#c7d2fe' },
+  met: { bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' },
+  no_answer: { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0' },
+  proposal_sent: { bg: '#fffbeb', color: '#d97706', border: '#fde68a' },
+  contract_signed: { bg: '#ecfdf5', color: '#047857', border: '#a7f3d0' },
+  other: { bg: '#f8fafc', color: '#374151', border: '#e2e8f0' },
 };
 
 export default function Logbog() {
@@ -77,26 +77,27 @@ export default function Logbog() {
       + ' kl. ' + d.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
   };
 
+  const hasFilters = activityFilter || companyFilter || dateFrom || dateTo;
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>Logbog</h1>
-        <button
-          onClick={() => setShowForm(true)}
-          style={{
-            backgroundColor: '#1a1a2e', color: '#fff', border: 'none',
-            padding: '10px 20px', borderRadius: 6, cursor: 'pointer', fontSize: 14, fontWeight: 600,
-          }}
-        >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#0f172a' }}>Logbog</h1>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#94a3b8' }}>
+            {filtered.length} indlæg{filtered.length !== 1 ? '' : ''}
+          </p>
+        </div>
+        <button onClick={() => setShowForm(true)} style={primaryBtnStyle}>
           + Log aktivitet
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 22, flexWrap: 'wrap', alignItems: 'center' }}>
         <select
           value={activityFilter}
           onChange={(e) => setActivityFilter(e.target.value)}
-          style={filterSelectStyle}
+          style={selectStyle}
         >
           <option value="">Alle aktiviteter</option>
           {Object.entries(activityLabels).map(([key, label]) => (
@@ -106,7 +107,7 @@ export default function Logbog() {
         <select
           value={companyFilter}
           onChange={(e) => setCompanyFilter(e.target.value)}
-          style={{ ...filterSelectStyle, minWidth: 180 }}
+          style={{ ...selectStyle, minWidth: 180 }}
         >
           <option value="">Alle virksomheder</option>
           {companies.map((c) => (
@@ -114,7 +115,7 @@ export default function Logbog() {
           ))}
         </select>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 13, color: '#888' }}>Fra</span>
+          <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>Fra</span>
           <input
             type="date"
             value={dateFrom}
@@ -123,7 +124,7 @@ export default function Logbog() {
           />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 13, color: '#888' }}>Til</span>
+          <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>Til</span>
           <input
             type="date"
             value={dateTo}
@@ -131,10 +132,14 @@ export default function Logbog() {
             style={dateInputStyle}
           />
         </div>
-        {(activityFilter || companyFilter || dateFrom || dateTo) && (
+        {hasFilters && (
           <button
             onClick={() => { setActivityFilter(''); setCompanyFilter(''); setDateFrom(''); setDateTo(''); }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#dc2626', padding: '10px 8px' }}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 12, color: '#ef4444', padding: '9px 6px',
+              fontFamily: 'inherit', fontWeight: 500,
+            }}
           >
             Ryd filtre
           </button>
@@ -142,55 +147,58 @@ export default function Logbog() {
       </div>
 
       {loading ? (
-        <p style={{ color: '#888' }}>Indlæser...</p>
+        <p style={{ color: '#94a3b8', fontSize: 14 }}>Indlæser...</p>
       ) : filtered.length === 0 ? (
-        <p style={{ color: '#888' }}>Ingen logindlæg fundet.</p>
+        <div style={{ ...cardStyle, padding: 40, textAlign: 'center' }}>
+          <p style={{ color: '#94a3b8', fontSize: 14, margin: 0 }}>Ingen logindlæg fundet.</p>
+        </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-          {filtered.map((entry) => {
+        <div style={cardStyle}>
+          {filtered.map((entry, i) => {
             const ac = activityColors[entry.activity_type] || activityColors.other;
             return (
               <div
                 key={entry.id}
                 style={{
-                  backgroundColor: '#fff',
                   padding: '16px 20px',
-                  borderBottom: '1px solid #f0f0f0',
-                  borderRadius: 0,
+                  borderBottom: i < filtered.length - 1 ? '1px solid #f1f5f9' : 'none',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
                       <span style={{
-                        padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600,
-                        backgroundColor: ac.bg, color: ac.color,
+                        padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500,
+                        backgroundColor: ac.bg, color: ac.color, border: `1px solid ${ac.border}`,
                       }}>
                         {activityLabels[entry.activity_type] || entry.activity_type}
                       </span>
                       {entry.companies?.name && (
                         <span
                           onClick={() => navigate(`/kontakter/${entry.companies.id}`)}
-                          style={{ fontSize: 14, fontWeight: 600, color: '#1a1a2e', cursor: 'pointer' }}
+                          style={{
+                            fontSize: 14, fontWeight: 600, color: '#0f172a', cursor: 'pointer',
+                            transition: 'color 0.15s ease',
+                          }}
                         >
                           {entry.companies.name}
                         </span>
                       )}
                       {entry.contacts?.name && (
-                        <span style={{ fontSize: 13, color: '#6b7280' }}>
+                        <span style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>
                           → {entry.contacts.name}
                         </span>
                       )}
                     </div>
                     {entry.notes && (
-                      <p style={{ margin: '4px 0 0', fontSize: 14, color: '#444', lineHeight: 1.5 }}>
+                      <p style={{ margin: '4px 0 0', fontSize: 14, color: '#334155', lineHeight: 1.6 }}>
                         {entry.notes}
                       </p>
                     )}
                   </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 20 }}>
-                    <div style={{ fontSize: 13, color: '#888' }}>{formatDateTime(entry.occurred_at)}</div>
-                    <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>{entry.logged_by}</div>
+                  <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 24 }}>
+                    <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>{formatDateTime(entry.occurred_at)}</div>
+                    <div style={{ fontSize: 11, color: '#cbd5e1', marginTop: 3 }}>{entry.logged_by}</div>
                   </div>
                 </div>
               </div>
@@ -209,19 +217,44 @@ export default function Logbog() {
   );
 }
 
-const filterSelectStyle = {
-  padding: '10px 14px',
-  border: '1px solid #ddd',
-  borderRadius: 6,
+const primaryBtnStyle = {
+  backgroundColor: '#6366f1',
+  color: '#fff',
+  border: 'none',
+  padding: '9px 18px',
+  borderRadius: 8,
+  cursor: 'pointer',
+  fontSize: 13,
+  fontWeight: 600,
+  fontFamily: 'inherit',
+  transition: 'background-color 0.15s ease',
+};
+
+const selectStyle = {
+  padding: '9px 13px',
+  border: '1px solid #e2e8f0',
+  borderRadius: 8,
   fontSize: 14,
   backgroundColor: '#fff',
   cursor: 'pointer',
+  fontFamily: 'inherit',
+  color: '#0f172a',
   minWidth: 160,
 };
 
 const dateInputStyle = {
-  padding: '9px 12px',
-  border: '1px solid #ddd',
-  borderRadius: 6,
-  fontSize: 14,
+  padding: '8px 12px',
+  border: '1px solid #e2e8f0',
+  borderRadius: 8,
+  fontSize: 13,
+  fontFamily: 'inherit',
+  color: '#0f172a',
+};
+
+const cardStyle = {
+  backgroundColor: '#fff',
+  borderRadius: 10,
+  overflow: 'hidden',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06)',
+  border: '1px solid rgba(0,0,0,0.06)',
 };
