@@ -6,7 +6,12 @@ import dineroRoutes from './routes/dinero.js';
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://cava-iaf.vercel.app',
+    'http://localhost:5173',
+  ],
+}));
 app.use(express.json());
 
 app.get('/health', (_req, res) => {
