@@ -26,21 +26,27 @@ let lastSyncTime = null;
 async function getDineroToken() {
   const basicAuth = Buffer.from(`${DINERO_API_KEY}:${DINERO_API_KEY}`).toString('base64');
 
-  const { data } = await axios.post(
-    DINERO_AUTH_URL,
-    'grant_type=password&scope=read+write&username=' +
-      encodeURIComponent(DINERO_API_KEY) +
-      '&password=' +
-      encodeURIComponent(DINERO_API_KEY),
-    {
-      headers: {
-        'Authorization': `Basic ${basicAuth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    }
-  );
+  try {
+    const { data } = await axios.post(
+      DINERO_AUTH_URL,
+      'grant_type=client_credentials&scope=read%20write',
+      {
+        headers: {
+          'Authorization': `Basic ${basicAuth}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      }
+    );
 
-  return data.access_token;
+    return data.access_token;
+  } catch (err) {
+    console.error('Dinero auth failed:', {
+      status: err.response?.status,
+      data: err.response?.data,
+      headers: err.response?.headers,
+    });
+    throw err;
+  }
 }
 
 // Fetch all pages from a paginated Dinero endpoint
@@ -211,10 +217,17 @@ router.get('/sync', async (_req, res) => {
       invoices_synced: invoicesUpserted,
     });
   } catch (err) {
-    console.error('Dinero sync error:', err.response?.data || err.message);
+    console.error('Dinero sync error:', {
+      message: err.message,
+      status: err.response?.status,
+      data: err.response?.data,
+    });
+    const detail = err.response?.data;
+    const errorMsg = typeof detail === 'string' ? detail
+      : detail?.message || detail?.error_description || detail?.error || err.message;
     res.status(500).json({
       success: false,
-      error: err.response?.data?.message || err.message,
+      error: errorMsg,
     });
   }
 });
