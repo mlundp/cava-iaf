@@ -4,6 +4,7 @@ import { supabase } from './lib/supabase';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Kontakter from './pages/Kontakter';
+import CompanyDetail from './pages/CompanyDetail';
 import Logbog from './pages/Logbog';
 import Medhjælperen from './pages/Medhjælperen';
 
@@ -34,6 +35,7 @@ export default function App() {
     <Layout session={session}>
       <Routes>
         <Route path="/kontakter" element={<Kontakter />} />
+        <Route path="/kontakter/:id" element={<CompanyDetail />} />
         <Route path="/logbog" element={<Logbog />} />
         <Route path="/medhjælperen" element={<Medhjælperen />} />
         <Route path="*" element={<Navigate to="/kontakter" replace />} />
