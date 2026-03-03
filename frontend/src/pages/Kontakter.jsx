@@ -11,6 +11,8 @@ const statusColors = {
 
 const typeLabels = { client: 'Klient', canvas: 'Canvas' };
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+
 export default function Kontakter() {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +20,7 @@ export default function Kontakter() {
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const navigate = useNavigate();
 
   const fetchCompanies = async () => {
@@ -32,6 +35,23 @@ export default function Kontakter() {
   useEffect(() => {
     fetchCompanies();
   }, []);
+
+  const handleDineroSync = async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch(`${API_URL}/api/dinero/sync`);
+      const result = await res.json();
+      if (!result.success) {
+        alert('Synkronisering fejlede: ' + (result.error || 'Ukendt fejl'));
+      } else {
+        await fetchCompanies();
+      }
+    } catch (err) {
+      alert('Kunne ikke forbinde til serveren: ' + err.message);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const updateStatus = async (e, id, newStatus) => {
     e.stopPropagation();
@@ -72,9 +92,22 @@ export default function Kontakter() {
             {filtered.length} virksomhed{filtered.length !== 1 ? 'er' : ''}
           </p>
         </div>
-        <button onClick={() => setShowForm(true)} style={primaryBtnStyle}>
-          + Tilføj virksomhed
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={handleDineroSync}
+            disabled={syncing}
+            style={{
+              ...secondaryBtnStyle,
+              opacity: syncing ? 0.7 : 1,
+              cursor: syncing ? 'wait' : 'pointer',
+            }}
+          >
+            {syncing ? 'Synkroniserer...' : 'Synkroniser Dinero'}
+          </button>
+          <button onClick={() => setShowForm(true)} style={primaryBtnStyle}>
+            + Tilføj virksomhed
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 22 }}>
@@ -203,6 +236,19 @@ export default function Kontakter() {
     </div>
   );
 }
+
+const secondaryBtnStyle = {
+  backgroundColor: '#fff',
+  color: '#374151',
+  border: '1px solid #e2e8f0',
+  padding: '9px 18px',
+  borderRadius: 8,
+  cursor: 'pointer',
+  fontSize: 13,
+  fontWeight: 600,
+  fontFamily: 'inherit',
+  transition: 'all 0.15s ease',
+};
 
 const primaryBtnStyle = {
   backgroundColor: '#6366f1',
