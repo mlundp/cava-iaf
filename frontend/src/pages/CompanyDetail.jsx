@@ -20,12 +20,12 @@ const statusColors = {
 const typeLabels = { client: 'Klient', canvas: 'Canvas' };
 
 const activityLabels = {
-  called: 'Ringet',
-  emailed: 'Emailet',
+  called: 'Ringet op',
+  emailed: 'Sendt mail',
   met: 'Møde',
-  no_answer: 'Intet svar',
+  no_answer: 'Ingen svar',
   proposal_sent: 'Tilbud sendt',
-  contract_signed: 'Kontrakt underskrevet',
+  contract_signed: 'Aftale indgået',
   other: 'Andet',
 };
 
