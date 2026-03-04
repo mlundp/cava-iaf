@@ -19,12 +19,14 @@ router.get('/:cvrNumber', async (req, res) => {
       headers: { 'User-Agent': 'cava-crm-itsafact' },
     });
 
+    console.log('CVR raw response:', JSON.stringify(data, null, 2));
+
     if (!data || !data.name) {
       return res.status(404).json({ error: 'Ingen virksomhed fundet med dette CVR-nummer.' });
     }
 
     const name = data.name || null;
-    const industry = data.industry || null;
+    const industry = data.industrydesc || null;
     const employee_count = data.employees ?? null;
 
     // Format address as "address, zipcode city"
