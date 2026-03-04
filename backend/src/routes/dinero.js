@@ -21,43 +21,80 @@ function getSupabase() {
 }
 
 let lastSyncTime = null;
+let cachedAuthHeader = null;
 
-// Get a bearer token from Dinero auth endpoint
-async function getDineroToken() {
-  const basicAuth = Buffer.from(`${DINERO_API_KEY}:${DINERO_API_KEY}`).toString('base64');
+// Try multiple auth strategies and return the working Authorization header
+async function getDineroAuthHeader() {
+  if (cachedAuthHeader) return cachedAuthHeader;
 
-  try {
-    const { data } = await axios.post(
-      DINERO_AUTH_URL,
-      'grant_type=client_credentials&scope=read%20write',
-      {
-        headers: {
-          'Authorization': `Basic ${basicAuth}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
+  const testUrl = `${DINERO_BASE}/${DINERO_ORG_ID}/contacts`;
+  const strategies = [
+    {
+      name: 'Bearer API key directly',
+      header: `Bearer ${DINERO_API_KEY}`,
+    },
+    {
+      name: 'Basic auth (apiKey as username, empty password)',
+      header: `Basic ${Buffer.from(`${DINERO_API_KEY}:`).toString('base64')}`,
+    },
+    {
+      name: 'OAuth client_credentials',
+      async resolve() {
+        const basicAuth = Buffer.from(`${DINERO_API_KEY}:${DINERO_API_KEY}`).toString('base64');
+        const { data } = await axios.post(
+          DINERO_AUTH_URL,
+          'grant_type=client_credentials&scope=read%20write',
+          {
+            headers: {
+              'Authorization': `Basic ${basicAuth}`,
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+          }
+        );
+        return `Bearer ${data.access_token}`;
+      },
+    },
+  ];
+
+  for (const strategy of strategies) {
+    let authHeader;
+    try {
+      if (strategy.resolve) {
+        console.log(`[Dinero auth] Trying: ${strategy.name} (token exchange)...`);
+        authHeader = await strategy.resolve();
+      } else {
+        authHeader = strategy.header;
       }
-    );
 
-    return data.access_token;
-  } catch (err) {
-    console.error('Dinero auth failed:', {
-      status: err.response?.status,
-      data: err.response?.data,
-      headers: err.response?.headers,
-    });
-    throw err;
+      console.log(`[Dinero auth] Trying: ${strategy.name}...`);
+      const resp = await axios.get(testUrl, {
+        headers: { 'Authorization': authHeader },
+        params: { page: 0, pageSize: 1 },
+      });
+      console.log(`[Dinero auth] SUCCESS with "${strategy.name}" — status ${resp.status}`);
+      cachedAuthHeader = authHeader;
+      return cachedAuthHeader;
+    } catch (err) {
+      console.error(`[Dinero auth] FAILED "${strategy.name}":`, {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+      });
+    }
   }
+
+  throw new Error('All Dinero auth strategies failed — see logs above for details');
 }
 
 // Fetch all pages from a paginated Dinero endpoint
-async function fetchAllPages(token, path) {
+async function fetchAllPages(authHeader, path) {
   const results = [];
   let page = 0;
   const pageSize = 250;
 
   while (true) {
     const { data } = await axios.get(`${DINERO_BASE}/${DINERO_ORG_ID}${path}`, {
-      headers: { 'Authorization': `Bearer ${token}` },
+      headers: { 'Authorization': authHeader },
       params: { page, pageSize },
     });
 
@@ -78,12 +115,12 @@ async function fetchAllPages(token, path) {
 router.get('/sync', async (_req, res) => {
   try {
     const db = getSupabase();
-    const token = await getDineroToken();
+    const authHeader = await getDineroAuthHeader();
 
     // Fetch contacts and invoices from Dinero
     const [dineroContacts, dineroInvoices] = await Promise.all([
-      fetchAllPages(token, '/contacts'),
-      fetchAllPages(token, '/invoices'),
+      fetchAllPages(authHeader, '/contacts'),
+      fetchAllPages(authHeader, '/invoices'),
     ]);
 
     let companiesUpserted = 0;
