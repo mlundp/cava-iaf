@@ -4,6 +4,7 @@ import axios from 'axios';
 const router = Router();
 
 const CVR_URL = 'https://api.cvr.dev/api/elastic/virksomhed/_search';
+const CVR_API_KEY = process.env.CVR_API_KEY;
 
 // GET /api/cvr/:cvrNumber
 router.get('/:cvrNumber', async (req, res) => {
@@ -13,10 +14,18 @@ router.get('/:cvrNumber', async (req, res) => {
     return res.status(400).json({ error: 'CVR-nummer skal være 8 cifre.' });
   }
 
+  if (!CVR_API_KEY) {
+    return res.status(500).json({ error: 'CVR API-nøgle mangler i serverkonfigurationen.' });
+  }
+
   try {
     const { data } = await axios.post(CVR_URL, {
       query: {
         term: { 'Vrvirksomhed.cvrNummer': Number(cvrNumber) },
+      },
+    }, {
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${CVR_API_KEY}:`).toString('base64')}`,
       },
     });
 
