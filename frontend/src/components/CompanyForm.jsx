@@ -35,6 +35,10 @@ export default function CompanyForm({ company, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [cvrLoading, setCvrLoading] = useState(false);
+  const [showNameSearch, setShowNameSearch] = useState(false);
+  const [nameQuery, setNameQuery] = useState('');
+  const [nameSearchLoading, setNameSearchLoading] = useState(false);
+  const [nameSearchResults, setNameSearchResults] = useState([]);
 
   const isCvrValid = /^\d{8}$/.test(form.cvr_number);
 
@@ -63,6 +67,42 @@ export default function CompanyForm({ company, onClose, onSaved }) {
     } finally {
       setCvrLoading(false);
     }
+  };
+
+  const handleNameSearch = async () => {
+    if (!nameQuery.trim()) return;
+    setNameSearchLoading(true);
+    setNameSearchResults([]);
+    setError('');
+    try {
+      const res = await fetch(`${API_URL}/api/cvr/search?q=${encodeURIComponent(nameQuery.trim())}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Kunne ikke søge på navn.');
+        setNameSearchLoading(false);
+        return;
+      }
+      setNameSearchResults(Array.isArray(data) ? data : []);
+    } catch {
+      setError('Netværksfejl — kunne ikke kontakte CVR-serveren.');
+    } finally {
+      setNameSearchLoading(false);
+    }
+  };
+
+  const selectSearchResult = (result) => {
+    setForm((prev) => ({
+      ...prev,
+      cvr_number: result.cvr_number || prev.cvr_number,
+      name: result.name || prev.name,
+      industry: result.industry || prev.industry,
+      employee_count: result.employee_count ?? prev.employee_count,
+      address: result.address || prev.address,
+      ownership: result.ownership || prev.ownership,
+    }));
+    setShowNameSearch(false);
+    setNameQuery('');
+    setNameSearchResults([]);
   };
 
   const handleChange = (e) => {
@@ -139,7 +179,7 @@ export default function CompanyForm({ company, onClose, onSaved }) {
                 <option value="cold">Cold</option>
               </select>
             </label>
-            <label style={labelStyle}>
+            <label style={{ ...labelStyle, gridColumn: '1 / -1' }}>
               CVR-nummer
               <div style={{ display: 'flex', gap: 8 }}>
                 <input name="cvr_number" value={form.cvr_number} onChange={handleChange} style={{ ...inputStyle, flex: 1 }} placeholder="12345678" />
@@ -151,7 +191,55 @@ export default function CompanyForm({ company, onClose, onSaved }) {
                 >
                   {cvrLoading ? 'Henter...' : 'Hent CVR-data'}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShowNameSearch((v) => !v)}
+                  style={cvrBtnStyle}
+                >
+                  Søg på navn
+                </button>
               </div>
+              {showNameSearch && (
+                <div style={{ marginTop: 8, padding: 12, backgroundColor: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                    <input
+                      value={nameQuery}
+                      onChange={(e) => setNameQuery(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNameSearch(); } }}
+                      placeholder="Søg på virksomhedsnavn..."
+                      style={{ ...inputStyle, flex: 1, fontSize: 13 }}
+                    />
+                    <button
+                      type="button"
+                      disabled={!nameQuery.trim() || nameSearchLoading}
+                      onClick={handleNameSearch}
+                      style={{ ...cvrBtnStyle, opacity: (!nameQuery.trim() || nameSearchLoading) ? 0.5 : 1 }}
+                    >
+                      {nameSearchLoading ? 'Søger...' : 'Søg'}
+                    </button>
+                  </div>
+                  {nameSearchResults.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {nameSearchResults.map((r, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => selectSearchResult(r)}
+                          style={searchResultStyle}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#eef2ff')}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#fff')}
+                        >
+                          <span style={{ fontWeight: 600, color: '#0f172a', fontSize: 13 }}>{r.name}</span>
+                          <span style={{ color: '#64748b', fontSize: 12 }}>CVR: {r.cvr_number}{r.city ? ` — ${r.city}` : ''}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {nameSearchResults.length === 0 && !nameSearchLoading && nameQuery.trim() && (
+                    <p style={{ margin: 0, fontSize: 13, color: '#94a3b8' }}>Ingen resultater.</p>
+                  )}
+                </div>
+              )}
             </label>
             <label style={labelStyle}>
               Branche
@@ -288,6 +376,22 @@ const cvrBtnStyle = {
   whiteSpace: 'nowrap',
   border: '1px solid #bae6fd',
   transition: 'all 0.15s ease',
+};
+
+const searchResultStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  gap: 2,
+  padding: '8px 10px',
+  border: '1px solid #e2e8f0',
+  borderRadius: 6,
+  cursor: 'pointer',
+  backgroundColor: '#fff',
+  fontFamily: 'inherit',
+  textAlign: 'left',
+  transition: 'background-color 0.1s ease',
+  width: '100%',
 };
 
 const saveBtnStyle = {
