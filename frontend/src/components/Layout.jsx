@@ -1,7 +1,63 @@
 import { NavLink } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../lib/theme';
+import { IconContacts, IconLog, IconAI, IconSun, IconMoon } from './Icons';
 
-const font = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif";
+const navItems = [
+  { to: '/kontakter', label: 'Kontakter', Icon: IconContacts },
+  { to: '/logbog', label: 'Logbog', Icon: IconLog },
+  { to: '/medhjælperen', label: 'Medhjælperen', Icon: IconAI },
+];
+
+export default function Layout({ session, children }) {
+  const { dark, toggle } = useTheme();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
+  return (
+    <div style={{ display: 'flex', minHeight: '100vh' }}>
+      <nav style={sidebarStyle}>
+        <div style={logoStyle}>Cava</div>
+        <div style={navSectionLabel}>Menu</div>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          {navItems.map(({ to, label, Icon }) => (
+            <li key={to}>
+              <NavLink
+                to={to}
+                style={({ isActive }) => ({
+                  ...linkBase,
+                  ...(isActive ? linkActiveExtra : {}),
+                })}
+              >
+                <Icon size={18} />
+                <span>{label}</span>
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+        <div style={{ marginTop: 'auto', padding: '16px 12px 4px', borderTop: '1px solid #1e293b' }}>
+          <button
+            onClick={toggle}
+            style={themeToggleStyle}
+            title={dark ? 'Skift til lys tilstand' : 'Skift til mørk tilstand'}
+          >
+            {dark ? <IconSun size={16} /> : <IconMoon size={16} />}
+            <span>{dark ? 'Lys tilstand' : 'Mørk tilstand'}</span>
+          </button>
+          <p style={{ fontSize: 12, color: '#64748b', marginBottom: 10, marginTop: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {session.user.email}
+          </p>
+          <button onClick={handleLogout} style={logoutBtnStyle}>
+            Log ud
+          </button>
+        </div>
+      </nav>
+      <main style={mainStyle}>{children}</main>
+    </div>
+  );
+}
 
 const sidebarStyle = {
   width: 220,
@@ -11,7 +67,7 @@ const sidebarStyle = {
   display: 'flex',
   flexDirection: 'column',
   minHeight: '100vh',
-  fontFamily: font,
+  fontFamily: 'var(--font)',
 };
 
 const logoStyle = {
@@ -38,6 +94,7 @@ const navSectionLabel = {
 const linkBase = {
   display: 'flex',
   alignItems: 'center',
+  gap: 10,
   padding: '9px 12px',
   borderRadius: 7,
   color: '#94a3b8',
@@ -46,85 +103,54 @@ const linkBase = {
   fontWeight: 500,
   marginBottom: 1,
   transition: 'all 0.15s ease',
+  borderLeft: '3px solid transparent',
 };
 
-const linkActive = {
-  ...linkBase,
+const linkActiveExtra = {
   backgroundColor: 'rgba(99, 102, 241, 0.15)',
   color: '#c7d2fe',
   fontWeight: 600,
+  borderLeft: '3px solid #6366f1',
 };
 
 const mainStyle = {
   flex: 1,
   padding: '28px 36px',
-  backgroundColor: '#fafbfc',
+  backgroundColor: 'var(--bg)',
   minHeight: '100vh',
   overflowY: 'auto',
-  fontFamily: font,
+  fontFamily: 'var(--font)',
+  color: 'var(--text)',
+  transition: 'background-color 0.2s ease, color 0.2s ease',
 };
 
-export default function Layout({ session, children }) {
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-  };
+const themeToggleStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  width: '100%',
+  padding: '8px 12px',
+  background: 'transparent',
+  border: '1px solid #1e293b',
+  borderRadius: 7,
+  color: '#94a3b8',
+  fontSize: 13,
+  fontWeight: 500,
+  cursor: 'pointer',
+  fontFamily: 'var(--font)',
+  transition: 'all 0.15s ease',
+};
 
-  return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <nav style={sidebarStyle}>
-        <div style={logoStyle}>Cava</div>
-        <div style={navSectionLabel}>Menu</div>
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-          <li>
-            <NavLink
-              to="/kontakter"
-              style={({ isActive }) => isActive ? linkActive : linkBase}
-            >
-              Kontakter
-            </NavLink>
-          </li>
-          <li>
-            <NavLink
-              to="/logbog"
-              style={({ isActive }) => isActive ? linkActive : linkBase}
-            >
-              Logbog
-            </NavLink>
-          </li>
-          <li>
-            <NavLink
-              to="/medhjælperen"
-              style={({ isActive }) => isActive ? linkActive : linkBase}
-            >
-              Medhjælperen
-            </NavLink>
-          </li>
-        </ul>
-        <div style={{ marginTop: 'auto', padding: '16px 12px 4px', borderTop: '1px solid #1e293b' }}>
-          <p style={{ fontSize: 12, color: '#64748b', marginBottom: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {session.user.email}
-          </p>
-          <button
-            onClick={handleLogout}
-            style={{
-              background: 'transparent',
-              border: '1px solid #1e293b',
-              color: '#94a3b8',
-              padding: '7px 0',
-              borderRadius: 7,
-              cursor: 'pointer',
-              fontSize: 13,
-              fontWeight: 500,
-              width: '100%',
-              fontFamily: font,
-              transition: 'all 0.15s ease',
-            }}
-          >
-            Log ud
-          </button>
-        </div>
-      </nav>
-      <main style={mainStyle}>{children}</main>
-    </div>
-  );
-}
+const logoutBtnStyle = {
+  background: 'transparent',
+  border: '1px solid #1e293b',
+  color: '#94a3b8',
+  padding: '7px 0',
+  borderRadius: 7,
+  cursor: 'pointer',
+  fontSize: 13,
+  fontWeight: 500,
+  width: '100%',
+  fontFamily: 'var(--font)',
+  transition: 'all 0.15s ease',
+};
