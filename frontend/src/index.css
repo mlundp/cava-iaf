@@ -1,0 +1,157 @@
+/* ── Cava Design System ── */
+
+:root {
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+
+  /* Light mode (default) */
+  --bg: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8fafc;
+  --bg-subtle: #f1f5f9;
+  --bg-input: #ffffff;
+
+  --text: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --text-faint: #94a3b8;
+  --text-placeholder: #cbd5e1;
+
+  --border: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --border-card: rgba(0, 0, 0, 0.06);
+
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --accent-bg: #eef2ff;
+  --accent-border: #c7d2fe;
+  --accent-text: #4338ca;
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-lg: 0 24px 48px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.08);
+
+  --th-bg: #fafbfc;
+  --overlay-bg: rgba(15, 23, 42, 0.4);
+
+  /* Skeleton */
+  --skeleton-bg: #e2e8f0;
+  --skeleton-shine: #f1f5f9;
+}
+
+[data-theme="dark"] {
+  --bg: #0f172a;
+  --bg-card: #1e293b;
+  --bg-card-hover: #243044;
+  --bg-subtle: #1e293b;
+  --bg-input: #1e293b;
+
+  --text: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-faint: #64748b;
+  --text-placeholder: #475569;
+
+  --border: #334155;
+  --border-subtle: #1e293b;
+  --border-card: rgba(255, 255, 255, 0.06);
+
+  --accent: #818cf8;
+  --accent-hover: #6366f1;
+  --accent-bg: rgba(99, 102, 241, 0.15);
+  --accent-border: rgba(99, 102, 241, 0.3);
+  --accent-text: #a5b4fc;
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-lg: 0 24px 48px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.3);
+
+  --th-bg: #1a2536;
+  --overlay-bg: rgba(0, 0, 0, 0.6);
+
+  --skeleton-bg: #334155;
+  --skeleton-shine: #475569;
+}
+
+/* ── Base reset ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  background-color: var(--bg);
+  color: var(--text);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* ── Focus rings ── */
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+  outline: none;
+}
+
+/* ── Modal animation ── */
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.cava-overlay {
+  animation: overlay-in 0.15s ease;
+}
+
+.cava-modal {
+  animation: modal-in 0.2s ease;
+}
+
+/* ── Expand/collapse transition ── */
+@keyframes expand-in {
+  from { opacity: 0; max-height: 0; margin-top: 0; padding: 0 14px; }
+  to { opacity: 1; max-height: 600px; margin-top: 12px; padding: 14px; }
+}
+
+.cava-expand {
+  animation: expand-in 0.2s ease forwards;
+  overflow: hidden;
+}
+
+/* ── Skeleton loading ── */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.skeleton-line {
+  height: 14px;
+  background: var(--skeleton-bg);
+  border-radius: 6px;
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+/* ── Scrollbar (dark mode) ── */
+[data-theme="dark"] ::-webkit-scrollbar {
+  width: 8px;
+}
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+/* ── Select styling for dark mode ── */
+[data-theme="dark"] select option {
+  background-color: #1e293b;
+  color: #f1f5f9;
+}
