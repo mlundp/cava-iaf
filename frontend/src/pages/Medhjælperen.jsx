@@ -9,8 +9,8 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 const actionLabels = {
   ring: { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' },
   'send email': { bg: '#eef2ff', color: '#4338ca', border: '#c7d2fe' },
-  'book m\u00f8de': { bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' },
-  'f\u00f8lg op': { bg: '#fffbeb', color: '#d97706', border: '#fde68a' },
+  'book møde': { bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' },
+  'følg op': { bg: '#fffbeb', color: '#d97706', border: '#fde68a' },
 };
 
 function getActionStyle(action) {
@@ -22,7 +22,7 @@ function getActionStyle(action) {
   return { bg: 'var(--bg-subtle)', color: 'var(--text-secondary)', border: 'var(--border)' };
 }
 
-export default function Medhj\u00e6lperen() {
+export default function Medhjælperen() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -60,7 +60,7 @@ export default function Medhj\u00e6lperen() {
       const data = await resp.json();
       if (!resp.ok) setError(data.error || 'Kunne ikke generere opgaver.');
       else await fetchTasks();
-    } catch { setError('Netv\u00e6rksfejl \u2014 kunne ikke kontakte serveren.'); }
+    } catch { setError('Netværksfejl \u2014 kunne ikke kontakte serveren.'); }
     finally { setGenerating(false); }
   };
 
@@ -94,11 +94,11 @@ export default function Medhj\u00e6lperen() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: 'var(--text)' }}>Medhj\u00e6lperen</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: 'var(--text)' }}>Medhjælperen</h1>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-faint)' }}>Din AI-assistent til salg og outreach</p>
         </div>
         <button onClick={handleGenerate} disabled={generating} style={{ ...primaryBtnStyle, opacity: generating ? 0.7 : 1 }}>
-          {generating ? 'Claude t\u00e6nker...' : 'Generer nye opgaver'}
+          {generating ? 'Claude tænker...' : 'Generer nye opgaver'}
         </button>
       </div>
 
@@ -196,7 +196,7 @@ function TaskCard({ task, expanded, editedEmail, onToggle, onEmailChange, onDone
             )}
           </div>
           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-            <button onClick={onDone} style={actionBtnDone}>Udf\u00f8rt</button>
+            <button onClick={onDone} style={actionBtnDone}>Udført</button>
             <button onClick={onSnooze} style={actionBtnSnooze}>Udskyd</button>
             <button onClick={onCancel} style={actionBtnCancel}>Annuller</button>
           </div>
@@ -225,7 +225,7 @@ function TaskCard({ task, expanded, editedEmail, onToggle, onEmailChange, onDone
           <div className="cava-expand" style={expandedContentStyle}>
             <textarea value={emailContent} onChange={(e) => onEmailChange(e.target.value)} rows={8} style={emailTextareaStyle} />
             <button onClick={() => navigator.clipboard.writeText(emailContent)} style={{ ...expandBtnStyle, marginTop: 8, backgroundColor: 'var(--accent-bg)' }}>
-              Kopi\u00e9r til udklipsholder
+              Kopiér til udklipsholder
             </button>
           </div>
         )}

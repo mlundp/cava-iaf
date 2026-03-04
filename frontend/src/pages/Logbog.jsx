@@ -6,8 +6,8 @@ import Skeleton from '../components/Skeleton';
 import { activityIcons, IconChat, IconLog } from '../components/Icons';
 
 const activityLabels = {
-  called: 'Ringet op', emailed: 'Sendt mail', met: 'M\u00f8de', no_answer: 'Ingen svar',
-  proposal_sent: 'Tilbud sendt', contract_signed: 'Aftale indg\u00e5et', other: 'Andet',
+  called: 'Ringet op', emailed: 'Sendt mail', met: 'Møde', no_answer: 'Ingen svar',
+  proposal_sent: 'Tilbud sendt', contract_signed: 'Aftale indgået', other: 'Andet',
 };
 
 const activityColors = {
@@ -65,7 +65,7 @@ export default function Logbog() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: 'var(--text)' }}>Logbog</h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-faint)' }}>{filtered.length} indl\u00e6g</p>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-faint)' }}>{filtered.length} indlæg</p>
         </div>
         <button onClick={() => setShowForm(true)} style={primaryBtnStyle}>+ Log aktivitet</button>
       </div>
@@ -103,7 +103,7 @@ export default function Logbog() {
           <p style={{ color: 'var(--text-muted)', fontSize: 15, margin: 0, fontWeight: 500 }}>
             Ingen aktiviteter {hasFilters ? 'fundet' : 'endnu'}.
           </p>
-          {!hasFilters && <p style={{ color: 'var(--text-faint)', fontSize: 13, margin: '6px 0 0' }}>Log din f\u00f8rste aktivitet for at komme i gang.</p>}
+          {!hasFilters && <p style={{ color: 'var(--text-faint)', fontSize: 13, margin: '6px 0 0' }}>Log din første aktivitet for at komme i gang.</p>}
         </div>
       ) : (
         <div style={cardStyle}>

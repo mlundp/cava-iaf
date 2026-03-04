@@ -92,13 +92,13 @@ export default function Kontakter() {
             {syncing ? 'Synkroniserer...' : 'Synkroniser Dinero'}
           </button>
           <button onClick={() => setShowForm(true)} style={primaryBtnStyle}>
-            + Tilf\u00f8j virksomhed
+            + Tilføj virksomhed
           </button>
         </div>
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 22 }}>
-        <input type="text" placeholder="S\u00f8g efter navn..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+        <input type="text" placeholder="Søg efter navn..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={{ ...selectStyle, minWidth: 140 }}>
           <option value="">Alle typer</option>
           <option value="client">Klient</option>
@@ -122,7 +122,7 @@ export default function Kontakter() {
           </p>
           {!search && !typeFilter && !statusFilter && (
             <p style={{ color: 'var(--text-faint)', fontSize: 13, margin: '6px 0 0' }}>
-              Tilf\u00f8j din f\u00f8rste virksomhed for at komme i gang.
+              Tilføj din første virksomhed for at komme i gang.
             </p>
           )}
         </div>

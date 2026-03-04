@@ -4,10 +4,10 @@ import { supabase } from '../lib/supabase';
 const activityTypes = [
   { key: 'called', label: 'Ringet op' },
   { key: 'emailed', label: 'Sendt mail' },
-  { key: 'met', label: 'M\u00f8de' },
+  { key: 'met', label: 'Møde' },
   { key: 'no_answer', label: 'Ingen svar' },
   { key: 'proposal_sent', label: 'Tilbud sendt' },
-  { key: 'contract_signed', label: 'Aftale indg\u00e5et' },
+  { key: 'contract_signed', label: 'Aftale indgået' },
   { key: 'other', label: 'Andet' },
 ];
 
@@ -54,8 +54,8 @@ export default function LogEntryForm({ onClose, onSaved }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.company_id) { setError('V\u00e6lg en virksomhed.'); return; }
-    if (!form.activity_type) { setError('V\u00e6lg en aktivitetstype.'); return; }
+    if (!form.company_id) { setError('Vælg en virksomhed.'); return; }
+    if (!form.activity_type) { setError('Vælg en aktivitetstype.'); return; }
     setSaving(true); setError('');
     const { data: { session } } = await supabase.auth.getSession();
     const loggedBy = session?.user?.email || 'ukendt';
@@ -82,7 +82,7 @@ export default function LogEntryForm({ onClose, onSaved }) {
 
           <label style={{ ...labelStyle, marginTop: 18, position: 'relative' }}>Virksomhed *
             <div ref={dropdownRef} style={{ position: 'relative' }}>
-              <input type="text" placeholder="S\u00f8g efter virksomhed..." value={companySearch}
+              <input type="text" placeholder="Søg efter virksomhed..." value={companySearch}
                 onChange={(e) => { setCompanySearch(e.target.value); setShowDropdown(true); if (!e.target.value) { setForm((p) => ({ ...p, company_id: '', contact_id: '' })); } }}
                 onFocus={() => setShowDropdown(true)} style={inputStyle} />
               {showDropdown && filteredCompanies.length > 0 && (
@@ -128,7 +128,7 @@ export default function LogEntryForm({ onClose, onSaved }) {
           </div>
 
           <label style={{ ...labelStyle, marginTop: 18 }}>Note (valgfri)
-            <textarea value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} rows={3} placeholder="Tilf\u00f8j en note..." style={{ ...inputStyle, resize: 'vertical' }} />
+            <textarea value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} rows={3} placeholder="Tilføj en note..." style={{ ...inputStyle, resize: 'vertical' }} />
           </label>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--border-subtle)' }}>
