@@ -93,6 +93,16 @@ export default function CompanyDetail() {
     fetchContacts();
   };
 
+  const deleteCompany = async () => {
+    if (!window.confirm('Er du sikker på, at du vil slette denne virksomhed? Dette kan ikke fortrydes.')) return;
+    const { error } = await supabase.from('companies').delete().eq('id', id);
+    if (error) {
+      console.error('Kunne ikke slette virksomhed:', error.message);
+      return;
+    }
+    navigate('/kontakter');
+  };
+
   if (loading) return <p style={{ color: '#94a3b8', fontSize: 14 }}>Indlæser...</p>;
   if (!company) return <p style={{ color: '#94a3b8', fontSize: 14 }}>Virksomhed ikke fundet.</p>;
 
@@ -132,9 +142,14 @@ export default function CompanyDetail() {
             </span>
           </div>
         </div>
-        <button onClick={() => setShowEditCompany(true)} style={secondaryBtnStyle}>
-          Rediger
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setShowEditCompany(true)} style={secondaryBtnStyle}>
+            Rediger
+          </button>
+          <button onClick={deleteCompany} style={deleteBtnStyle}>
+            Slet
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid #e2e8f0', marginBottom: 24 }}>
@@ -405,6 +420,19 @@ const detailTdStyle = {
   padding: '12px 14px',
   fontSize: 14,
   color: '#334155',
+};
+
+const deleteBtnStyle = {
+  backgroundColor: '#fff',
+  color: '#dc2626',
+  border: '1px solid #fecaca',
+  padding: '9px 18px',
+  borderRadius: 8,
+  cursor: 'pointer',
+  fontSize: 13,
+  fontWeight: 600,
+  fontFamily: 'inherit',
+  transition: 'all 0.15s ease',
 };
 
 const actionBtnStyle = {

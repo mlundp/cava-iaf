@@ -5,6 +5,51 @@ const router = Router();
 
 const CVR_URL = 'https://cvrapi.dk/api';
 
+// GET /api/cvr/search?q=<name>
+router.get('/search', async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) {
+    return res.status(400).json({ error: 'Søgeparameter "q" mangler.' });
+  }
+
+  try {
+    const { data } = await axios.get(CVR_URL, {
+      params: { search: q, country: 'dk' },
+      headers: { 'User-Agent': 'cava-crm-itsafact' },
+    });
+
+    console.log('CVR name search raw response:', JSON.stringify(data, null, 2));
+
+    // cvrapi.dk returns a single object — wrap it in an array
+    const results = Array.isArray(data) ? data : data && data.vat ? [data] : [];
+
+    const mapped = results.slice(0, 5).map((d) => ({
+      cvr_number: String(d.vat || ''),
+      name: d.name || '',
+      industry: d.industrydesc || '',
+      employee_count: d.employees ?? null,
+      address: [d.address, [d.zipcode, d.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '',
+      city: d.city || '',
+      ownership: Array.isArray(d.owners)
+        ? d.owners.map((o) => o.name || o).filter(Boolean).join(', ')
+        : d.owners ? String(d.owners) : '',
+    }));
+
+    res.json(mapped);
+  } catch (err) {
+    console.error('CVR navnesøgning fejlede:', {
+      message: err.message,
+      status: err.response?.status,
+      data: err.response?.data,
+    });
+    const status = err.response?.status || 500;
+    const detail = err.response?.data;
+    const errorMsg = typeof detail === 'string' ? detail
+      : detail?.message || detail?.error || 'Kunne ikke søge i CVR. Prøv igen senere.';
+    res.status(status).json({ error: errorMsg });
+  }
+});
+
 // GET /api/cvr/:cvrNumber
 router.get('/:cvrNumber', async (req, res) => {
   const { cvrNumber } = req.params;
