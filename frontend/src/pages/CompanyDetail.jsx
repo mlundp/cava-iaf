@@ -25,8 +25,8 @@ const typeStyles = {
 };
 
 const activityLabels = {
-  called: 'Ringet op', emailed: 'Sendt mail', met: 'M\u00f8de', no_answer: 'Ingen svar',
-  proposal_sent: 'Tilbud sendt', contract_signed: 'Aftale indg\u00e5et', other: 'Andet',
+  called: 'Ringet op', emailed: 'Sendt mail', met: 'Møde', no_answer: 'Ingen svar',
+  proposal_sent: 'Tilbud sendt', contract_signed: 'Aftale indgået', other: 'Andet',
 };
 
 const activityColors = {
@@ -87,7 +87,7 @@ export default function CompanyDetail() {
   };
 
   const deleteCompany = async () => {
-    if (!window.confirm('Er du sikker p\u00e5, at du vil slette denne virksomhed? Dette kan ikke fortrydes.')) return;
+    if (!window.confirm('Er du sikker på, at du vil slette denne virksomhed? Dette kan ikke fortrydes.')) return;
     const { error } = await supabase.from('companies').delete().eq('id', id);
     if (error) {
       console.error('Kunne ikke slette virksomhed:', error.message);
@@ -165,7 +165,7 @@ function InfoTab({ company }) {
     { label: 'CVR-nummer', value: company.cvr_number },
     { label: 'Branche', value: company.industry },
     { label: 'Antal ansatte', value: company.employee_count },
-    { label: '\u00c5rlig oms\u00e6tning', value: company.annual_revenue_cvr ? Number(company.annual_revenue_cvr).toLocaleString('da-DK') + ' kr.' : null },
+    { label: 'Årlig omsætning', value: company.annual_revenue_cvr ? Number(company.annual_revenue_cvr).toLocaleString('da-DK') + ' kr.' : null },
     { label: 'Adresse', value: company.address },
     { label: 'Ejerskab', value: company.ownership },
     { label: 'Total faktureret', value: company.total_invoiced_dkk ? Number(company.total_invoiced_dkk).toLocaleString('da-DK') + ' kr.' : '0 kr.' },
@@ -198,7 +198,7 @@ function KontakterTab({ contacts, onAdd, onEdit, onDelete }) {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Kontaktpersoner</h3>
-        <button onClick={onAdd} style={primaryBtnSmallStyle}>+ Tilf\u00f8j kontakt</button>
+        <button onClick={onAdd} style={primaryBtnSmallStyle}>+ Tilføj kontakt</button>
       </div>
       {contacts.length === 0 ? (
         <p style={{ color: 'var(--text-faint)', fontSize: 14 }}>Ingen kontaktpersoner endnu.</p>
@@ -207,7 +207,7 @@ function KontakterTab({ contacts, onAdd, onEdit, onDelete }) {
           <thead>
             <tr>
               <th style={detailThStyle}>Navn</th><th style={detailThStyle}>Titel</th><th style={detailThStyle}>Email</th>
-              <th style={detailThStyle}>Telefon</th><th style={detailThStyle}>Prim\u00e6r</th><th style={detailThStyle}></th>
+              <th style={detailThStyle}>Telefon</th><th style={detailThStyle}>Primær</th><th style={detailThStyle}></th>
             </tr>
           </thead>
           <tbody>
@@ -247,7 +247,7 @@ function ProjekterTab({ projects }) {
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr><th style={detailThStyle}>Projekt</th><th style={detailThStyle}>Bel\u00f8b</th><th style={detailThStyle}>Fakturadato</th><th style={detailThStyle}>Beskrivelse</th></tr>
+            <tr><th style={detailThStyle}>Projekt</th><th style={detailThStyle}>Beløb</th><th style={detailThStyle}>Fakturadato</th><th style={detailThStyle}>Beskrivelse</th></tr>
           </thead>
           <tbody>
             {projects.map((p) => (
@@ -273,7 +273,7 @@ function LogbogTab({ entries }) {
     <div>
       <h3 style={{ margin: '0 0 18px', fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Aktivitetslog</h3>
       {entries.length === 0 ? (
-        <p style={{ color: 'var(--text-faint)', fontSize: 14 }}>Ingen logindl\u00e6g endnu.</p>
+        <p style={{ color: 'var(--text-faint)', fontSize: 14 }}>Ingen logindlæg endnu.</p>
       ) : (
         <div>
           {entries.map((entry) => {

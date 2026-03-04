@@ -20,7 +20,7 @@ export default function Login() {
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg)', fontFamily: 'var(--font)', transition: 'background-color 0.2s ease' }}>
       <div style={{ width: '100%', maxWidth: 380, backgroundColor: 'var(--bg-card)', borderRadius: 12, padding: '36px 32px', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-card)' }}>
         <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--text)', marginBottom: 6 }}>Cava</div>
-        <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 28, marginTop: 0 }}>Log ind for at forts\u00e6tte</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 28, marginTop: 0 }}>Log ind for at fortsætte</p>
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 18 }}>
             <label htmlFor="email" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>E-mail</label>

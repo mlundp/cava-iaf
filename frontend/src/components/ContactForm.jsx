@@ -24,7 +24,7 @@ export default function ContactForm({ companyId, contact, onClose, onSaved }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name.trim()) { setError('Navn er p\u00e5kr\u00e6vet.'); return; }
+    if (!form.name.trim()) { setError('Navn er påkrævet.'); return; }
     setSaving(true); setError('');
     const payload = { company_id: companyId, name: form.name.trim(), title: form.title.trim() || null, email: form.email.trim() || null, phone: form.phone.trim() || null, is_primary: form.is_primary, notes: form.notes.trim() || null };
     let result;
@@ -39,7 +39,7 @@ export default function ContactForm({ companyId, contact, onClose, onSaved }) {
       <div className="cava-modal" style={modalStyle} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
-            {isEdit ? 'Rediger kontakt' : 'Tilf\u00f8j kontakt'}
+            {isEdit ? 'Rediger kontakt' : 'Tilføj kontakt'}
           </h2>
           <button onClick={onClose} style={closeBtnStyle}>\u00d7</button>
         </div>
@@ -55,7 +55,7 @@ export default function ContactForm({ companyId, contact, onClose, onSaved }) {
           </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 20, fontSize: 14, cursor: 'pointer', color: 'var(--text-secondary)', fontWeight: 500 }}>
             <input name="is_primary" type="checkbox" checked={form.is_primary} onChange={handleChange} style={{ width: 16, height: 16, accentColor: 'var(--accent)', cursor: 'pointer' }} />
-            Prim\u00e6r kontakt
+            Primær kontakt
           </label>
           <label style={{ ...labelStyle, marginTop: 20 }}>Noter
             <textarea name="notes" value={form.notes} onChange={handleChange} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
@@ -63,7 +63,7 @@ export default function ContactForm({ companyId, contact, onClose, onSaved }) {
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--border-subtle)' }}>
             <button type="button" onClick={onClose} style={cancelBtnStyle}>Annuller</button>
             <button type="submit" disabled={saving} style={{ ...saveBtnStyle, opacity: saving ? 0.7 : 1 }}>
-              {saving ? 'Gemmer...' : isEdit ? 'Gem \u00e6ndringer' : 'Opret'}
+              {saving ? 'Gemmer...' : isEdit ? 'Gem ændringer' : 'Opret'}
             </button>
           </div>
         </form>

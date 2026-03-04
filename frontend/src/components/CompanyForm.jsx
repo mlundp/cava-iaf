@@ -42,7 +42,7 @@ export default function CompanyForm({ company, onClose, onSaved }) {
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Kunne ikke hente CVR-data.'); setCvrLoading(false); return; }
       setForm((p) => ({ ...p, name: data.name || p.name, industry: data.industry || p.industry, employee_count: data.employee_count ?? p.employee_count, address: data.address || p.address, ownership: data.ownership || p.ownership }));
-    } catch { setError('Netv\u00e6rksfejl \u2014 kunne ikke kontakte CVR-serveren.'); }
+    } catch { setError('Netværksfejl \u2014 kunne ikke kontakte CVR-serveren.'); }
     finally { setCvrLoading(false); }
   };
 
@@ -55,13 +55,13 @@ export default function CompanyForm({ company, onClose, onSaved }) {
       const res = await fetch(`${API_URL}/api/cvr/search?q=${encodeURIComponent(nameQuery.trim())}`);
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Kunne ikke s\u00f8ge p\u00e5 navn.');
+        setError(data.error || 'Kunne ikke søge på navn.');
         setNameSearchLoading(false);
         return;
       }
       setNameSearchResults(Array.isArray(data) ? data : []);
     } catch {
-      setError('Netv\u00e6rksfejl \u2014 kunne ikke kontakte CVR-serveren.');
+      setError('Netværksfejl \u2014 kunne ikke kontakte CVR-serveren.');
     } finally {
       setNameSearchLoading(false);
     }
@@ -86,7 +86,7 @@ export default function CompanyForm({ company, onClose, onSaved }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name.trim()) { setError('Navn er p\u00e5kr\u00e6vet.'); return; }
+    if (!form.name.trim()) { setError('Navn er påkrævet.'); return; }
     setSaving(true); setError('');
     const payload = {
       name: form.name.trim(), type: form.type, status: form.status,
@@ -107,7 +107,7 @@ export default function CompanyForm({ company, onClose, onSaved }) {
       <div className="cava-modal" style={modalStyle} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
-            {isEdit ? 'Rediger virksomhed' : 'Tilf\u00f8j virksomhed'}
+            {isEdit ? 'Rediger virksomhed' : 'Tilføj virksomhed'}
           </h2>
           <button onClick={onClose} style={closeBtnStyle}>\u00d7</button>
         </div>
@@ -139,7 +139,7 @@ export default function CompanyForm({ company, onClose, onSaved }) {
                   onClick={() => setShowNameSearch((v) => !v)}
                   style={cvrBtnStyle}
                 >
-                  S\u00f8g p\u00e5 navn
+                  Søg på navn
                 </button>
               </div>
               {showNameSearch && (
@@ -149,7 +149,7 @@ export default function CompanyForm({ company, onClose, onSaved }) {
                       value={nameQuery}
                       onChange={(e) => setNameQuery(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNameSearch(); } }}
-                      placeholder="S\u00f8g p\u00e5 virksomhedsnavn..."
+                      placeholder="Søg på virksomhedsnavn..."
                       style={{ ...inputStyle, flex: 1, fontSize: 13 }}
                     />
                     <button
@@ -158,7 +158,7 @@ export default function CompanyForm({ company, onClose, onSaved }) {
                       onClick={handleNameSearch}
                       style={{ ...cvrBtnStyle, opacity: (!nameQuery.trim() || nameSearchLoading) ? 0.5 : 1 }}
                     >
-                      {nameSearchLoading ? 'S\u00f8ger...' : 'S\u00f8g'}
+                      {nameSearchLoading ? 'Søger...' : 'Søg'}
                     </button>
                   </div>
                   {nameSearchResults.length > 0 && (
@@ -195,7 +195,7 @@ export default function CompanyForm({ company, onClose, onSaved }) {
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--border-subtle)' }}>
             <button type="button" onClick={onClose} style={cancelBtnStyle}>Annuller</button>
             <button type="submit" disabled={saving} style={{ ...saveBtnStyle, opacity: saving ? 0.7 : 1 }}>
-              {saving ? 'Gemmer...' : isEdit ? 'Gem \u00e6ndringer' : 'Opret'}
+              {saving ? 'Gemmer...' : isEdit ? 'Gem ændringer' : 'Opret'}
             </button>
           </div>
         </form>
