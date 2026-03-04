@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+
 const initialState = {
   name: '',
   type: 'canvas',
@@ -9,6 +11,7 @@ const initialState = {
   industry: '',
   employee_count: '',
   address: '',
+  ownership: '',
   notes: '',
 };
 
@@ -24,12 +27,43 @@ export default function CompanyForm({ company, onClose, onSaved }) {
           industry: company.industry || '',
           employee_count: company.employee_count ?? '',
           address: company.address || '',
+          ownership: company.ownership || '',
           notes: company.notes || '',
         }
       : initialState
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [cvrLoading, setCvrLoading] = useState(false);
+
+  const isCvrValid = /^\d{8}$/.test(form.cvr_number);
+
+  const handleCvrLookup = async () => {
+    if (!isCvrValid) return;
+    setCvrLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_URL}/api/cvr/${form.cvr_number}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Kunne ikke hente CVR-data.');
+        setCvrLoading(false);
+        return;
+      }
+      setForm((prev) => ({
+        ...prev,
+        name: data.name || prev.name,
+        industry: data.industry || prev.industry,
+        employee_count: data.employee_count ?? prev.employee_count,
+        address: data.address || prev.address,
+        ownership: data.ownership || prev.ownership,
+      }));
+    } catch {
+      setError('Netværksfejl — kunne ikke kontakte CVR-serveren.');
+    } finally {
+      setCvrLoading(false);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -53,6 +87,7 @@ export default function CompanyForm({ company, onClose, onSaved }) {
       industry: form.industry.trim() || null,
       employee_count: form.employee_count ? parseInt(form.employee_count, 10) : null,
       address: form.address.trim() || null,
+      ownership: form.ownership.trim() || null,
       notes: form.notes.trim() || null,
     };
 
@@ -106,7 +141,17 @@ export default function CompanyForm({ company, onClose, onSaved }) {
             </label>
             <label style={labelStyle}>
               CVR-nummer
-              <input name="cvr_number" value={form.cvr_number} onChange={handleChange} style={inputStyle} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input name="cvr_number" value={form.cvr_number} onChange={handleChange} style={{ ...inputStyle, flex: 1 }} placeholder="12345678" />
+                <button
+                  type="button"
+                  disabled={!isCvrValid || cvrLoading}
+                  onClick={handleCvrLookup}
+                  style={{ ...cvrBtnStyle, opacity: (!isCvrValid || cvrLoading) ? 0.5 : 1 }}
+                >
+                  {cvrLoading ? 'Henter...' : 'Hent CVR-data'}
+                </button>
+              </div>
             </label>
             <label style={labelStyle}>
               Branche
@@ -116,9 +161,13 @@ export default function CompanyForm({ company, onClose, onSaved }) {
               Antal ansatte
               <input name="employee_count" type="number" value={form.employee_count} onChange={handleChange} style={inputStyle} />
             </label>
-            <label style={{ ...labelStyle, gridColumn: '1 / -1' }}>
+            <label style={labelStyle}>
               Adresse
               <input name="address" value={form.address} onChange={handleChange} style={inputStyle} />
+            </label>
+            <label style={labelStyle}>
+              Ejerskab
+              <input name="ownership" value={form.ownership} onChange={handleChange} style={inputStyle} />
             </label>
             <label style={{ ...labelStyle, gridColumn: '1 / -1' }}>
               Noter
@@ -223,6 +272,21 @@ const cancelBtnStyle = {
   backgroundColor: '#fff',
   color: '#374151',
   fontFamily: 'inherit',
+  transition: 'all 0.15s ease',
+};
+
+const cvrBtnStyle = {
+  padding: '10px 14px',
+  border: 'none',
+  borderRadius: 8,
+  cursor: 'pointer',
+  fontSize: 12,
+  fontWeight: 600,
+  backgroundColor: '#f0f9ff',
+  color: '#0369a1',
+  fontFamily: 'inherit',
+  whiteSpace: 'nowrap',
+  border: '1px solid #bae6fd',
   transition: 'all 0.15s ease',
 };
 
