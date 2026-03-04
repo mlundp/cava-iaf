@@ -21,6 +21,11 @@ export default function CompanyForm({ company, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [cvrLoading, setCvrLoading] = useState(false);
+  const [showNameSearch, setShowNameSearch] = useState(false);
+  const [nameQuery, setNameQuery] = useState('');
+  const [nameSearchLoading, setNameSearchLoading] = useState(false);
+  const [nameSearchResults, setNameSearchResults] = useState([]);
+
   const isCvrValid = /^\d{8}$/.test(form.cvr_number);
 
   useEffect(() => {
@@ -39,6 +44,42 @@ export default function CompanyForm({ company, onClose, onSaved }) {
       setForm((p) => ({ ...p, name: data.name || p.name, industry: data.industry || p.industry, employee_count: data.employee_count ?? p.employee_count, address: data.address || p.address, ownership: data.ownership || p.ownership }));
     } catch { setError('Netv\u00e6rksfejl \u2014 kunne ikke kontakte CVR-serveren.'); }
     finally { setCvrLoading(false); }
+  };
+
+  const handleNameSearch = async () => {
+    if (!nameQuery.trim()) return;
+    setNameSearchLoading(true);
+    setNameSearchResults([]);
+    setError('');
+    try {
+      const res = await fetch(`${API_URL}/api/cvr/search?q=${encodeURIComponent(nameQuery.trim())}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Kunne ikke s\u00f8ge p\u00e5 navn.');
+        setNameSearchLoading(false);
+        return;
+      }
+      setNameSearchResults(Array.isArray(data) ? data : []);
+    } catch {
+      setError('Netv\u00e6rksfejl \u2014 kunne ikke kontakte CVR-serveren.');
+    } finally {
+      setNameSearchLoading(false);
+    }
+  };
+
+  const selectSearchResult = (result) => {
+    setForm((prev) => ({
+      ...prev,
+      cvr_number: result.cvr_number || prev.cvr_number,
+      name: result.name || prev.name,
+      industry: result.industry || prev.industry,
+      employee_count: result.employee_count ?? prev.employee_count,
+      address: result.address || prev.address,
+      ownership: result.ownership || prev.ownership,
+    }));
+    setShowNameSearch(false);
+    setNameQuery('');
+    setNameSearchResults([]);
   };
 
   const handleChange = (e) => { const { name, value } = e.target; setForm((p) => ({ ...p, [name]: value })); };
@@ -86,13 +127,62 @@ export default function CompanyForm({ company, onClose, onSaved }) {
                 <option value="hot">Hot</option><option value="warm">Warm</option><option value="cold">Cold</option>
               </select>
             </label>
-            <label style={labelStyle}>CVR-nummer
+            <label style={{ ...labelStyle, gridColumn: '1 / -1' }}>
+              CVR-nummer
               <div style={{ display: 'flex', gap: 8 }}>
                 <input name="cvr_number" value={form.cvr_number} onChange={handleChange} style={{ ...inputStyle, flex: 1 }} placeholder="12345678" />
                 <button type="button" disabled={!isCvrValid || cvrLoading} onClick={handleCvrLookup} style={{ ...cvrBtnStyle, opacity: (!isCvrValid || cvrLoading) ? 0.5 : 1 }}>
                   {cvrLoading ? 'Henter...' : 'Hent CVR-data'}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShowNameSearch((v) => !v)}
+                  style={cvrBtnStyle}
+                >
+                  S\u00f8g p\u00e5 navn
+                </button>
               </div>
+              {showNameSearch && (
+                <div style={{ marginTop: 8, padding: 12, backgroundColor: 'var(--bg-subtle)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                    <input
+                      value={nameQuery}
+                      onChange={(e) => setNameQuery(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleNameSearch(); } }}
+                      placeholder="S\u00f8g p\u00e5 virksomhedsnavn..."
+                      style={{ ...inputStyle, flex: 1, fontSize: 13 }}
+                    />
+                    <button
+                      type="button"
+                      disabled={!nameQuery.trim() || nameSearchLoading}
+                      onClick={handleNameSearch}
+                      style={{ ...cvrBtnStyle, opacity: (!nameQuery.trim() || nameSearchLoading) ? 0.5 : 1 }}
+                    >
+                      {nameSearchLoading ? 'S\u00f8ger...' : 'S\u00f8g'}
+                    </button>
+                  </div>
+                  {nameSearchResults.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {nameSearchResults.map((r, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => selectSearchResult(r)}
+                          style={searchResultStyle}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-card)')}
+                        >
+                          <span style={{ fontWeight: 600, color: 'var(--text)', fontSize: 13 }}>{r.name}</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>CVR: {r.cvr_number}{r.city ? ` \u2014 ${r.city}` : ''}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {nameSearchResults.length === 0 && !nameSearchLoading && nameQuery.trim() && (
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--text-faint)' }}>Ingen resultater.</p>
+                  )}
+                </div>
+              )}
             </label>
             <label style={labelStyle}>Branche<input name="industry" value={form.industry} onChange={handleChange} style={inputStyle} /></label>
             <label style={labelStyle}>Antal ansatte<input name="employee_count" type="number" value={form.employee_count} onChange={handleChange} style={inputStyle} /></label>
@@ -123,4 +213,5 @@ const closeBtnStyle = { background: 'none', border: 'none', fontSize: 20, cursor
 const errorStyle = { color: '#dc2626', fontSize: 13, margin: '0 0 16px', padding: '10px 14px', backgroundColor: '#fef2f2', borderRadius: 8, border: '1px solid #fecaca' };
 const cancelBtnStyle = { padding: '10px 18px', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, backgroundColor: 'var(--bg-card)', color: 'var(--text-secondary)', fontFamily: 'inherit', transition: 'all 0.15s ease' };
 const cvrBtnStyle = { padding: '10px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, backgroundColor: '#f0f9ff', color: '#0369a1', fontFamily: 'inherit', whiteSpace: 'nowrap', border: '1px solid #bae6fd', transition: 'all 0.15s ease' };
+const searchResultStyle = { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', backgroundColor: 'var(--bg-card)', fontFamily: 'inherit', textAlign: 'left', transition: 'background-color 0.1s ease', width: '100%' };
 const saveBtnStyle = { padding: '10px 18px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, backgroundColor: 'var(--accent)', color: '#fff', fontFamily: 'inherit', transition: 'background-color 0.15s ease' };

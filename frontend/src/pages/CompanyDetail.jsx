@@ -86,6 +86,16 @@ export default function CompanyDetail() {
     fetchContacts();
   };
 
+  const deleteCompany = async () => {
+    if (!window.confirm('Er du sikker p\u00e5, at du vil slette denne virksomhed? Dette kan ikke fortrydes.')) return;
+    const { error } = await supabase.from('companies').delete().eq('id', id);
+    if (error) {
+      console.error('Kunne ikke slette virksomhed:', error.message);
+      return;
+    }
+    navigate('/kontakter');
+  };
+
   if (loading) return <div style={{ padding: 20 }}><Skeleton rows={8} /></div>;
   if (!company) return <p style={{ color: 'var(--text-faint)', fontSize: 14 }}>Virksomhed ikke fundet.</p>;
 
@@ -115,7 +125,10 @@ export default function CompanyDetail() {
             </span>
           </div>
         </div>
-        <button onClick={() => setShowEditCompany(true)} style={secondaryBtnStyle}>Rediger</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setShowEditCompany(true)} style={secondaryBtnStyle}>Rediger</button>
+          <button onClick={deleteCompany} style={deleteBtnStyle}>Slet</button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
@@ -290,6 +303,7 @@ function LogbogTab({ entries }) {
 
 const cardStyle = { backgroundColor: 'var(--bg-card)', borderRadius: 12, padding: 24, boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-card)', transition: 'background-color 0.2s ease' };
 const secondaryBtnStyle = { backgroundColor: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)', padding: '9px 18px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', transition: 'all 0.15s ease' };
+const deleteBtnStyle = { backgroundColor: 'var(--bg-card)', color: '#dc2626', border: '1px solid #fecaca', padding: '9px 18px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', transition: 'all 0.15s ease' };
 const primaryBtnSmallStyle = { backgroundColor: 'var(--accent)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', transition: 'background-color 0.15s ease' };
 const detailThStyle = { padding: '10px 14px', fontSize: 11, fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'left', borderBottom: '1px solid var(--border-subtle)' };
 const detailTdStyle = { padding: '12px 14px', fontSize: 14, color: 'var(--text-secondary)' };
