@@ -5,7 +5,9 @@ import { createClient } from '@supabase/supabase-js';
 const router = Router();
 
 const DINERO_API_KEY = process.env.DINERO_API_KEY;
-const DINERO_ORG_ID = process.env.DINERO_ORGANISATION_ID;
+const DINERO_CLIENT_ID = process.env.DINERO_CLIENT_ID;
+const DINERO_CLIENT_SECRET = process.env.DINERO_CLIENT_SECRET;
+const DINERO_ORG_ID = process.env.DINERO_ORGANISATION_ID || '175405';
 const DINERO_BASE = 'https://api.dinero.dk/v1';
 const DINERO_AUTH_URL = 'https://authz.dinero.dk/dineroapi/oauth/token';
 
@@ -21,69 +23,38 @@ function getSupabase() {
 }
 
 let lastSyncTime = null;
-let cachedAuthHeader = null;
+let cachedToken = null;
+let tokenExpiresAt = null;
 
-// Try multiple auth strategies and return the working Authorization header
+// Obtain an OAuth access token using grant_type=password
 async function getDineroAuthHeader() {
-  if (cachedAuthHeader) return cachedAuthHeader;
-
-  const testUrl = `${DINERO_BASE}/${DINERO_ORG_ID}/contacts`;
-  const strategies = [
-    {
-      name: 'Bearer API key directly',
-      header: `Bearer ${DINERO_API_KEY}`,
-    },
-    {
-      name: 'Basic auth (apiKey as username, empty password)',
-      header: `Basic ${Buffer.from(`${DINERO_API_KEY}:`).toString('base64')}`,
-    },
-    {
-      name: 'OAuth client_credentials',
-      async resolve() {
-        const basicAuth = Buffer.from(`${DINERO_API_KEY}:${DINERO_API_KEY}`).toString('base64');
-        const { data } = await axios.post(
-          DINERO_AUTH_URL,
-          'grant_type=client_credentials&scope=read%20write',
-          {
-            headers: {
-              'Authorization': `Basic ${basicAuth}`,
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-          }
-        );
-        return `Bearer ${data.access_token}`;
-      },
-    },
-  ];
-
-  for (const strategy of strategies) {
-    let authHeader;
-    try {
-      if (strategy.resolve) {
-        console.log(`[Dinero auth] Trying: ${strategy.name} (token exchange)...`);
-        authHeader = await strategy.resolve();
-      } else {
-        authHeader = strategy.header;
-      }
-
-      console.log(`[Dinero auth] Trying: ${strategy.name}...`);
-      const resp = await axios.get(testUrl, {
-        headers: { 'Authorization': authHeader },
-        params: { page: 0, pageSize: 1 },
-      });
-      console.log(`[Dinero auth] SUCCESS with "${strategy.name}" — status ${resp.status}`);
-      cachedAuthHeader = authHeader;
-      return cachedAuthHeader;
-    } catch (err) {
-      console.error(`[Dinero auth] FAILED "${strategy.name}":`, {
-        status: err.response?.status,
-        statusText: err.response?.statusText,
-        data: err.response?.data,
-      });
-    }
+  // Return cached token if still valid (with 60s buffer)
+  if (cachedToken && tokenExpiresAt && Date.now() < tokenExpiresAt - 60000) {
+    return `Bearer ${cachedToken}`;
   }
 
-  throw new Error('All Dinero auth strategies failed — see logs above for details');
+  const basicAuth = Buffer.from(`${DINERO_CLIENT_ID}:${DINERO_CLIENT_SECRET}`).toString('base64');
+
+  console.log('[Dinero auth] Requesting token via grant_type=password...');
+  const { data } = await axios.post(
+    DINERO_AUTH_URL,
+    `grant_type=password&scope=read%20write&username=${encodeURIComponent(DINERO_API_KEY)}&password=${encodeURIComponent(DINERO_API_KEY)}`,
+    {
+      headers: {
+        'Authorization': `Basic ${basicAuth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    }
+  );
+
+  cachedToken = data.access_token;
+  // Cache token for its lifetime (expires_in is in seconds)
+  if (data.expires_in) {
+    tokenExpiresAt = Date.now() + data.expires_in * 1000;
+  }
+  console.log('[Dinero auth] Token obtained successfully');
+
+  return `Bearer ${cachedToken}`;
 }
 
 // Fetch all pages from a paginated Dinero endpoint
