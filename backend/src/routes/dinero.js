@@ -11,6 +11,12 @@ const DINERO_ORG_ID = process.env.DINERO_ORGANISATION_ID || '175405';
 const DINERO_BASE = 'https://api.dinero.dk/v1';
 const DINERO_AUTH_URL = 'https://authz.dinero.dk/dineroapi/oauth/token';
 
+// Startup check: verify credentials are loaded from environment
+console.log('[Dinero config] DINERO_CLIENT_ID:', DINERO_CLIENT_ID ? `${DINERO_CLIENT_ID.slice(0, 4)}...` : 'NOT SET');
+console.log('[Dinero config] DINERO_CLIENT_SECRET:', DINERO_CLIENT_SECRET ? `${DINERO_CLIENT_SECRET.slice(0, 4)}...` : 'NOT SET');
+console.log('[Dinero config] DINERO_API_KEY:', DINERO_API_KEY ? `${DINERO_API_KEY.slice(0, 4)}...` : 'NOT SET');
+console.log('[Dinero config] DINERO_ORG_ID:', DINERO_ORG_ID);
+
 let _supabase;
 function getSupabase() {
   if (!_supabase) {
@@ -34,25 +40,42 @@ async function getDineroAuthHeader() {
   }
 
   const basicAuth = Buffer.from(`${DINERO_CLIENT_ID}:${DINERO_CLIENT_SECRET}`).toString('base64');
+  const requestBody = `grant_type=password&scope=read%20write&username=${encodeURIComponent(DINERO_API_KEY)}&password=${encodeURIComponent(DINERO_API_KEY)}`;
 
   console.log('[Dinero auth] Requesting token via grant_type=password...');
-  const { data } = await axios.post(
-    DINERO_AUTH_URL,
-    `grant_type=password&scope=read%20write&username=${encodeURIComponent(DINERO_API_KEY)}&password=${encodeURIComponent(DINERO_API_KEY)}`,
-    {
+  console.log('[Dinero auth] URL:', DINERO_AUTH_URL);
+  console.log('[Dinero auth] Basic auth string:', basicAuth);
+  console.log('[Dinero auth] Request body:', requestBody);
+
+  let response;
+  try {
+    response = await axios.post(DINERO_AUTH_URL, requestBody, {
       headers: {
         'Authorization': `Basic ${basicAuth}`,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-    }
-  );
+    });
+  } catch (err) {
+    console.error('[Dinero auth] Token request FAILED:', {
+      status: err.response?.status,
+      statusText: err.response?.statusText,
+      headers: err.response?.headers,
+      data: err.response?.data,
+    });
+    throw err;
+  }
 
+  console.log('[Dinero auth] Token response status:', response.status);
+  console.log('[Dinero auth] Token response headers:', response.headers);
+  console.log('[Dinero auth] Token response data keys:', Object.keys(response.data));
+
+  const { data } = response;
   cachedToken = data.access_token;
   // Cache token for its lifetime (expires_in is in seconds)
   if (data.expires_in) {
     tokenExpiresAt = Date.now() + data.expires_in * 1000;
   }
-  console.log('[Dinero auth] Token obtained successfully');
+  console.log('[Dinero auth] Token obtained successfully, expires_in:', data.expires_in);
 
   return `Bearer ${cachedToken}`;
 }
