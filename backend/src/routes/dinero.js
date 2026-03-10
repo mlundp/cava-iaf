@@ -112,7 +112,7 @@ router.get('/sync', async (_req, res) => {
     const authHeader = await getDineroAuthHeader();
 
     // Fetch contacts from Dinero
-    const dineroContacts = await fetchAllPages(authHeader, '/contacts');
+    const dineroContacts = await fetchAllPages(authHeader, '/contacts', { queryFilter: "IsDebtor+eq+'true'" });
 
     let companiesUpserted = 0;
     let contactsSkipped = 0;
