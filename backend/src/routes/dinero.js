@@ -81,7 +81,7 @@ async function getDineroAuthHeader() {
 }
 
 // Fetch all pages from a paginated Dinero endpoint
-async function fetchAllPages(authHeader, path) {
+async function fetchAllPages(authHeader, path, extraParams = {}) {
   const results = [];
   let page = 0;
   const pageSize = 250;
@@ -89,7 +89,7 @@ async function fetchAllPages(authHeader, path) {
   while (true) {
     const { data } = await axios.get(`${DINERO_BASE}/${DINERO_ORG_ID}${path}`, {
       headers: { 'Authorization': authHeader },
-      params: { page, pageSize },
+      params: { page, pageSize, ...extraParams },
     });
 
     const items = data.Collection || data.collection || data;
@@ -111,23 +111,28 @@ router.get('/sync', async (_req, res) => {
     const db = getSupabase();
     const authHeader = await getDineroAuthHeader();
 
-    // Fetch contacts and invoices from Dinero
-    const [dineroContacts, dineroInvoices] = await Promise.all([
-      fetchAllPages(authHeader, '/contacts'),
-      fetchAllPages(authHeader, '/invoices'),
-    ]);
+    // Fetch contacts from Dinero
+    const dineroContacts = await fetchAllPages(authHeader, '/contacts');
 
     let companiesUpserted = 0;
+    let contactsSkipped = 0;
     let invoicesUpserted = 0;
 
     // Map of dinero contact guid -> supabase company id
     const contactIdMap = {};
 
-    // Upsert contacts as companies
+    // Upsert contacts as companies — only customers (IsDebtor)
     for (const contact of dineroContacts) {
       const contactGuid = contact.ContactGuid || contact.contactGuid;
       const name = contact.Name || contact.name;
       if (!contactGuid || !name) continue;
+
+      // Only sync customers (debitors), skip suppliers and others
+      const isDebtor = contact.IsDebtor ?? contact.isDebtor ?? contact.IsDebitor ?? contact.isDebitor ?? false;
+      if (!isDebtor) {
+        contactsSkipped++;
+        continue;
+      }
 
       const companyData = {
         dinero_contact_id: contactGuid,
@@ -169,6 +174,13 @@ router.get('/sync', async (_req, res) => {
       }
     }
 
+    // Fetch invoices (Booked and Paid) from Dinero
+    const [bookedInvoices, paidInvoices] = await Promise.all([
+      fetchAllPages(authHeader, '/invoices', { queryFilter: "Status+eq+'Booked'" }),
+      fetchAllPages(authHeader, '/invoices', { queryFilter: "Status+eq+'Paid'" }),
+    ]);
+    const dineroInvoices = [...bookedInvoices, ...paidInvoices];
+
     // Upsert invoices as projects and compute per-company totals
     const companyInvoiceTotals = {}; // companyId -> { total, lastDate }
 
@@ -179,6 +191,7 @@ router.get('/sync', async (_req, res) => {
       if (!invoiceGuid || !companyId) continue;
 
       const amount = invoice.TotalInclVat ?? invoice.totalInclVat ??
+                     invoice.TotalAmount ?? invoice.totalAmount ??
                      invoice.TotalExclVat ?? invoice.totalExclVat ?? 0;
       const invoiceDate = invoice.Date || invoice.date ||
                           invoice.InvoiceDate || invoice.invoiceDate || null;
@@ -227,15 +240,18 @@ router.get('/sync', async (_req, res) => {
       }
     }
 
-    // Update company totals and auto-promote to client
+    // Update company totals and auto-promote to client if invoiced > 0
     for (const [companyId, totals] of Object.entries(companyInvoiceTotals)) {
+      const updateData = {
+        total_invoiced_dkk: totals.total,
+        last_invoice_date: totals.lastDate?.toISOString()?.slice(0, 10) || null,
+      };
+      if (totals.total > 0) {
+        updateData.type = 'client';
+      }
       await db
         .from('companies')
-        .update({
-          total_invoiced_dkk: totals.total,
-          last_invoice_date: totals.lastDate?.toISOString()?.slice(0, 10) || null,
-          type: 'client',
-        })
+        .update(updateData)
         .eq('id', companyId);
     }
 
@@ -245,6 +261,7 @@ router.get('/sync', async (_req, res) => {
       success: true,
       synced_at: lastSyncTime,
       companies_synced: companiesUpserted,
+      contacts_skipped_non_customer: contactsSkipped,
       invoices_synced: invoicesUpserted,
     });
   } catch (err) {
