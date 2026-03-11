@@ -81,15 +81,16 @@ async function getDineroAuthHeader() {
 }
 
 // Fetch all pages from a paginated Dinero endpoint
-async function fetchAllPages(authHeader, path, extraParams = {}) {
+async function fetchAllPages(authHeader, path) {
   const results = [];
   let page = 0;
   const pageSize = 250;
 
   while (true) {
-    const { data } = await axios.get(`${DINERO_BASE}/${DINERO_ORG_ID}${path}`, {
+    const separator = path.includes('?') ? '&' : '?';
+    const url = `${DINERO_BASE}/${DINERO_ORG_ID}${path}${separator}page=${page}&pageSize=${pageSize}`;
+    const { data } = await axios.get(url, {
       headers: { 'Authorization': authHeader },
-      params: { page, pageSize, ...extraParams },
     });
 
     const items = data.Collection || data.collection || data;
@@ -177,8 +178,8 @@ router.get('/sync', async (_req, res) => {
 
     // Fetch invoices (Booked and Paid) from Dinero
     const [bookedInvoices, paidInvoices] = await Promise.all([
-      fetchAllPages(authHeader, '/invoices', { queryFilter: "Status+eq+'Booked'" }),
-      fetchAllPages(authHeader, '/invoices', { queryFilter: "Status+eq+'Paid'" }),
+      fetchAllPages(authHeader, "/invoices?queryFilter=Status+eq+'Booked'"),
+      fetchAllPages(authHeader, "/invoices?queryFilter=Status+eq+'Paid'"),
     ]);
     const dineroInvoices = [...bookedInvoices, ...paidInvoices];
 
