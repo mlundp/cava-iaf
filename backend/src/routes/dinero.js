@@ -112,9 +112,11 @@ router.get('/sync', async (_req, res) => {
     const db = getSupabase();
     const authHeader = await getDineroAuthHeader();
 
+    console.log('[Sync] Starting contact fetch...');
     // Fetch contacts from Dinero
     const allContacts = await fetchAllPages(authHeader, '/contacts');
     const dineroContacts = allContacts.filter(c => c.IsDebtor === true);
+    console.log('[Sync] Contacts fetched:', allContacts.length, 'total,', dineroContacts.length, 'debtors');
 
     let companiesUpserted = 0;
     let contactsSkipped = 0;
@@ -177,8 +179,10 @@ router.get('/sync', async (_req, res) => {
     }
 
     // Fetch invoices from Dinero and filter client-side
+    console.log('[Sync] Starting invoice fetch...');
     const allInvoices = await fetchAllPages(authHeader, '/invoices');
     const dineroInvoices = allInvoices.filter(inv => inv.Status === 'Booked' || inv.Status === 'Paid');
+    console.log('[Sync] Invoices fetched:', allInvoices.length, 'total,', dineroInvoices.length, 'filtered');
 
     // Upsert invoices as projects and compute per-company totals
     const companyInvoiceTotals = {}; // companyId -> { total, lastDate }
@@ -254,6 +258,8 @@ router.get('/sync', async (_req, res) => {
         .eq('id', companyId);
     }
 
+    console.log('[Sync] Upsert complete');
+
     lastSyncTime = new Date().toISOString();
 
     res.json({
@@ -264,6 +270,7 @@ router.get('/sync', async (_req, res) => {
       invoices_synced: invoicesUpserted,
     });
   } catch (err) {
+    console.error('[Sync] FATAL ERROR:', err.message, err.stack);
     console.error('Dinero sync error:', {
       message: err.message,
       status: err.response?.status,
