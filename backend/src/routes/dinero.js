@@ -176,12 +176,9 @@ router.get('/sync', async (_req, res) => {
       }
     }
 
-    // Fetch invoices (Booked and Paid) from Dinero
-    const [bookedInvoices, paidInvoices] = await Promise.all([
-      fetchAllPages(authHeader, "/invoices?queryFilter=Status+eq+'Booked'"),
-      fetchAllPages(authHeader, "/invoices?queryFilter=Status+eq+'Paid'"),
-    ]);
-    const dineroInvoices = [...bookedInvoices, ...paidInvoices];
+    // Fetch invoices from Dinero and filter client-side
+    const allInvoices = await fetchAllPages(authHeader, '/invoices');
+    const dineroInvoices = allInvoices.filter(inv => inv.Status === 'Booked' || inv.Status === 'Paid');
 
     // Upsert invoices as projects and compute per-company totals
     const companyInvoiceTotals = {}; // companyId -> { total, lastDate }
