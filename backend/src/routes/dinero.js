@@ -115,6 +115,7 @@ router.get('/sync', async (_req, res) => {
     console.log('[Sync] Starting contact fetch...');
     // Fetch contacts from Dinero
     const allContacts = await fetchAllPages(authHeader, '/contacts');
+    console.log('[Debug] First contact:', JSON.stringify(allContacts[0], null, 2));
     const dineroContacts = allContacts.filter(c => c.IsDebtor === true);
     console.log('[Sync] Contacts fetched:', allContacts.length, 'total,', dineroContacts.length, 'debtors');
 
@@ -181,6 +182,7 @@ router.get('/sync', async (_req, res) => {
     // Fetch invoices from Dinero and filter client-side
     console.log('[Sync] Starting invoice fetch...');
     const allInvoices = await fetchAllPages(authHeader, '/invoices');
+    console.log('[Debug] First invoice:', JSON.stringify(allInvoices[0], null, 2));
     const dineroInvoices = allInvoices.filter(inv => inv.Status === 'Booked' || inv.Status === 'Paid');
     console.log('[Sync] Invoices fetched:', allInvoices.length, 'total,', dineroInvoices.length, 'filtered');
 
