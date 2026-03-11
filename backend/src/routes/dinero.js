@@ -113,11 +113,9 @@ router.get('/sync', async (_req, res) => {
     const authHeader = await getDineroAuthHeader();
 
     console.log('[Sync] Starting contact fetch...');
-    // Fetch contacts from Dinero
-    const allContacts = await fetchAllPages(authHeader, '/contacts');
-    console.log('[Debug] First contact:', JSON.stringify(allContacts[0], null, 2));
-    const dineroContacts = allContacts.filter(c => c.IsDebtor === true);
-    console.log('[Sync] Contacts fetched:', allContacts.length, 'total,', dineroContacts.length, 'debtors');
+    // Fetch contacts (debtors only) from Dinero
+    const dineroContacts = await fetchAllPages(authHeader, '/contacts?isDebtor=true');
+    console.log('[Sync] Contacts fetched:', dineroContacts.length, 'debtors');
 
     let companiesUpserted = 0;
     let contactsSkipped = 0;
@@ -179,12 +177,14 @@ router.get('/sync', async (_req, res) => {
       }
     }
 
-    // Fetch invoices from Dinero and filter client-side
+    // Fetch invoices from Dinero (booked + paid)
     console.log('[Sync] Starting invoice fetch...');
-    const allInvoices = await fetchAllPages(authHeader, '/invoices');
-    console.log('[Debug] First invoice:', JSON.stringify(allInvoices[0], null, 2));
-    const dineroInvoices = allInvoices.filter(inv => inv.Status === 'Booked' || inv.Status === 'Paid');
-    console.log('[Sync] Invoices fetched:', allInvoices.length, 'total,', dineroInvoices.length, 'filtered');
+    const [bookedInvoices, paidInvoices] = await Promise.all([
+      fetchAllPages(authHeader, '/invoices/booked'),
+      fetchAllPages(authHeader, '/invoices/paid'),
+    ]);
+    const dineroInvoices = [...bookedInvoices, ...paidInvoices];
+    console.log('[Sync] Invoices fetched:', bookedInvoices.length, 'booked,', paidInvoices.length, 'paid');
 
     // Upsert invoices as projects and compute per-company totals
     const companyInvoiceTotals = {}; // companyId -> { total, lastDate }
