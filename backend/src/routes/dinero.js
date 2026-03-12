@@ -177,14 +177,13 @@ router.get('/sync', async (_req, res) => {
       }
     }
 
-    // Fetch invoices from Dinero (booked + paid)
+    // Fetch all invoices from Dinero
     console.log('[Sync] Starting invoice fetch...');
-    const [bookedInvoices, paidInvoices] = await Promise.all([
-      fetchAllPages(authHeader, '/invoices/booked'),
-      fetchAllPages(authHeader, '/invoices/paid'),
-    ]);
-    const dineroInvoices = [...bookedInvoices, ...paidInvoices];
-    console.log('[Sync] Invoices fetched:', bookedInvoices.length, 'booked,', paidInvoices.length, 'paid');
+    const allInvoices = await fetchAllPages(authHeader, '/invoices');
+    console.log('[Debug] First invoice keys:', Object.keys(allInvoices[0] || {}));
+    console.log('[Debug] First invoice sample:', JSON.stringify(allInvoices[0], null, 2));
+    const dineroInvoices = allInvoices;
+    console.log('[Sync] Invoices fetched:', allInvoices.length, 'total');
 
     // Upsert invoices as projects and compute per-company totals
     const companyInvoiceTotals = {}; // companyId -> { total, lastDate }
