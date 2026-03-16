@@ -137,42 +137,26 @@ router.get('/sync', async (_req, res) => {
         continue;
       }
 
-      const companyData = {
+      const row = {
         dinero_contact_id: contactGuid,
         name,
+        type: 'canvas',
+        status: 'cold',
       };
 
-      // Check if company already exists
-      const { data: existing } = await db
+      const { data: upserted, error } = await db
         .from('companies')
-        .select('id, type')
-        .eq('dinero_contact_id', contactGuid)
-        .maybeSingle();
+        .upsert(row, { onConflict: 'dinero_contact_id' })
+        .select('id')
+        .single();
 
-      let companyId;
-      if (existing) {
-        // Update name only
-        await db
-          .from('companies')
-          .update({ name: companyData.name })
-          .eq('id', existing.id);
-        companyId = existing.id;
-      } else {
-        // Insert new company
-        const { data: inserted } = await db
-          .from('companies')
-          .insert({
-            ...companyData,
-            type: 'canvas',
-            status: 'cold',
-          })
-          .select('id')
-          .single();
-        companyId = inserted?.id;
+      if (error) {
+        console.error('[Sync] Upsert failed for', contactGuid, error.message);
+        continue;
       }
 
-      if (companyId) {
-        contactIdMap[contactGuid] = companyId;
+      if (upserted?.id) {
+        contactIdMap[contactGuid] = upserted.id;
         companiesUpserted++;
       }
     }
