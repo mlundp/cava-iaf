@@ -6,6 +6,8 @@ import ContactForm from '../components/ContactForm';
 import Skeleton from '../components/Skeleton';
 import { activityIcons, IconChat } from '../components/Icons';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+
 const tabs = [
   { key: 'info', label: 'Info' },
   { key: 'kontakter', label: 'Kontakter' },
@@ -168,7 +170,7 @@ function InfoTab({ company, onCompanyUpdated }) {
     setSyncing(true);
     setSyncMsg(null);
     try {
-      const res = await fetch(`/api/dinero/sync-invoices/${company.dinero_contact_id}`, { method: 'POST' });
+      const res = await fetch(`${API_URL}/api/dinero/sync-invoices/${company.dinero_contact_id}`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Ukendt fejl');
       setSyncMsg('Opdateret');
