@@ -117,6 +117,15 @@ router.get('/sync', async (_req, res) => {
     const dineroContacts = await fetchAllPages(authHeader, '/contacts?isDebtor=true');
     console.log('[Sync] Contacts fetched:', dineroContacts.length, 'debtors');
 
+    // Fetch invoice list to determine which contacts have invoices
+    const invoices = await fetchAllPages(authHeader, '/invoices?fields=ContactGuid&pageSize=1000');
+    const invoiceContactGuids = new Set();
+    for (const inv of invoices) {
+      const guid = inv.ContactGuid || inv.contactGuid;
+      if (guid) invoiceContactGuids.add(guid);
+    }
+    console.log('[Sync] Contacts with invoices:', invoiceContactGuids.size);
+
     let companiesUpserted = 0;
     let contactsSkipped = 0;
     let invoicesUpserted = 0;
@@ -124,7 +133,7 @@ router.get('/sync', async (_req, res) => {
     // Map of dinero contact guid -> supabase company id
     const contactIdMap = {};
 
-    // Upsert contacts as companies — only customers (IsDebtor)
+    // Upsert contacts as companies — only those with invoices
     if (dineroContacts.length > 0) {
       console.log('[Sync] First contact sample:', JSON.stringify(dineroContacts[0]));
     }
@@ -132,6 +141,12 @@ router.get('/sync', async (_req, res) => {
       const contactGuid = contact.ContactGuid || contact.contactGuid;
       const name = contact.Name || contact.name;
       if (!contactGuid || !name) continue;
+
+      // Skip contacts that have no invoices
+      if (!invoiceContactGuids.has(contactGuid)) {
+        contactsSkipped++;
+        continue;
+      }
 
       const row = {
         dinero_contact_id: contactGuid,
