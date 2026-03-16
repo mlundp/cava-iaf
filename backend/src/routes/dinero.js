@@ -209,39 +209,51 @@ router.post('/sync-invoices/:contactGuid', async (req, res) => {
     const authHeader = await getDineroAuthHeader();
     const { contactGuid } = req.params;
 
-    console.log('[SyncInvoices] Fetching invoices for contact:', contactGuid);
+    console.log('[InvoiceSync] Fetching invoices for contactGuid:', contactGuid);
 
-    // Fetch invoice list with needed fields in a single call
-    const allInvoices = await fetchAllPages(authHeader, '/invoices?fields=ContactGuid,TotalInclVat,Date&pageSize=1000');
-    console.log('[SyncInvoices] Total invoices in list:', allInvoices.length);
+    // Step 1: Fetch all invoices from list endpoint (returns Guid, ContactName, Date, etc.)
+    const allInvoices = await fetchAllPages(authHeader, '/invoices');
+    console.log('[InvoiceSync] Total invoices fetched:', allInvoices.length);
 
-    // Filter client-side by ContactGuid and accumulate totals
-    let totalInclVat = 0;
-    let latestDate = null;
-    let invoicesCount = 0;
-
+    // Step 2: Fetch detail for each invoice to get ContactGuid and TotalExclVat
+    const matchingInvoices = [];
     for (const inv of allInvoices) {
-      const invContactGuid = inv.ContactGuid || inv.contactGuid;
-      if (invContactGuid !== contactGuid) continue;
+      const guid = inv.Guid || inv.guid;
+      if (!guid) continue;
 
-      const amount = inv.TotalInclVat || inv.totalInclVat || 0;
-      totalInclVat += Number(amount);
-      invoicesCount++;
+      const detailRes = await axios.get(
+        `${DINERO_BASE}/${DINERO_ORG_ID}/invoices/${guid}`,
+        { headers: { 'Authorization': authHeader } }
+      );
+      const detail = detailRes.data;
 
-      const invoiceDate = inv.Date || inv.date || null;
+      // Step 3: Filter by ContactGuid
+      if (detail.ContactGuid === contactGuid) {
+        matchingInvoices.push(detail);
+      }
+    }
+
+    console.log('[InvoiceSync] Matching invoices found:', matchingInvoices.length);
+
+    // Step 4: Sum TotalExclVat and find most recent Date
+    let totalExclVat = 0;
+    let latestDate = null;
+
+    for (const detail of matchingInvoices) {
+      totalExclVat += Number(detail.TotalExclVat || 0);
+
+      const invoiceDate = detail.Date || null;
       if (invoiceDate && (!latestDate || invoiceDate > latestDate)) {
         latestDate = invoiceDate;
       }
     }
 
-    console.log('[SyncInvoices] Matched invoices:', invoicesCount, 'total:', totalInclVat);
-
-    // Update company in Supabase
+    // Step 5: Update company in Supabase
     const updateData = {
-      total_invoiced_dkk: totalInclVat,
+      total_invoiced_dkk: totalExclVat,
       last_invoice_date: latestDate,
     };
-    if (totalInclVat > 0) {
+    if (totalExclVat > 0) {
       updateData.type = 'client';
     }
 
@@ -253,17 +265,20 @@ router.post('/sync-invoices/:contactGuid', async (req, res) => {
 
     if (company) {
       await db.from('companies').update(updateData).eq('id', company.id);
-      console.log('[SyncInvoices] Updated company:', company.name, 'total:', totalInclVat);
+      console.log('[InvoiceSync] Updated company:', company.name, 'total:', totalExclVat);
+    } else {
+      console.log('[InvoiceSync] No company found for contactGuid:', contactGuid);
     }
 
+    // Step 6: Return results
     res.json({
       success: true,
-      total_invoiced_dkk: totalInclVat,
+      total_invoiced_dkk: totalExclVat,
       last_invoice_date: latestDate,
-      invoices_count: invoicesCount,
+      invoices_count: matchingInvoices.length,
     });
   } catch (err) {
-    console.error('[SyncInvoices] ERROR:', err.message, err.stack);
+    console.error('[InvoiceSync] ERROR:', err.message, err.stack);
     const detail = err.response?.data;
     const errorMsg = typeof detail === 'string' ? detail
       : detail?.message || detail?.error_description || detail?.error || err.message;
