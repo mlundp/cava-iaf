@@ -182,6 +182,17 @@ router.get('/sync', async (_req, res) => {
     const allInvoices = await fetchAllPages(authHeader, '/invoices');
     console.log('[Debug] First invoice keys:', Object.keys(allInvoices[0] || {}));
     console.log('[Debug] First invoice sample:', JSON.stringify(allInvoices[0], null, 2));
+
+    // Fetch full detail for first invoice to see all available fields
+    if (allInvoices[0]) {
+      const firstInvoice = allInvoices[0];
+      const detailRes = await axios.get(
+        `${DINERO_BASE}/${DINERO_ORG_ID}/invoices/${firstInvoice.Guid}`,
+        { headers: { 'Authorization': authHeader } }
+      );
+      console.log('[Debug] Invoice detail:', JSON.stringify(detailRes.data, null, 2));
+    }
+
     const dineroInvoices = allInvoices;
     console.log('[Sync] Invoices fetched:', allInvoices.length, 'total');
 
