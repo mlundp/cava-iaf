@@ -151,8 +151,10 @@ router.get('/sync', async (_req, res) => {
         .single();
 
       if (error) {
-        console.error('[Sync] Upsert failed for', contactGuid, error.message);
+        console.error('[Sync] Upsert error:', error.message, error.details);
         continue;
+      } else {
+        console.log('[Sync] Upserted row:', row.name);
       }
 
       if (upserted?.id) {
