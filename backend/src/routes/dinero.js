@@ -177,97 +177,36 @@ router.get('/sync', async (_req, res) => {
       }
     }
 
-    // Fetch all invoices from Dinero
-    console.log('[Sync] Starting invoice fetch...');
-    const allInvoices = await fetchAllPages(authHeader, '/invoices');
-    console.log('[Debug] First invoice keys:', Object.keys(allInvoices[0] || {}));
-    console.log('[Debug] First invoice sample:', JSON.stringify(allInvoices[0], null, 2));
+    // Test with one invoice: fetch detail and update matching company
+    console.log('[Sync] Starting single invoice test...');
+    const testGuid = '45f3216f-5674-4396-b82a-1d2b6eaeae74';
+    const detailRes = await axios.get(
+      `${DINERO_BASE}/${DINERO_ORG_ID}/invoices/${testGuid}`,
+      { headers: { 'Authorization': authHeader } }
+    );
+    const detail = detailRes.data;
+    console.log('[Debug] Invoice detail:', JSON.stringify(detail, null, 2));
 
-    // Fetch full detail for first invoice to see all available fields
-    if (allInvoices[0]) {
-      const firstInvoice = allInvoices[0];
-      const detailRes = await axios.get(
-        `${DINERO_BASE}/${DINERO_ORG_ID}/invoices/${firstInvoice.Guid}`,
-        { headers: { 'Authorization': authHeader } }
-      );
-      console.log('[Debug] Invoice detail:', JSON.stringify(detailRes.data, null, 2));
-    }
+    // Find matching company in Supabase
+    const { data: matchedCompany } = await db
+      .from('companies')
+      .select('id, name')
+      .eq('dinero_contact_id', detail.ContactGuid)
+      .maybeSingle();
 
-    const dineroInvoices = allInvoices;
-    console.log('[Sync] Invoices fetched:', allInvoices.length, 'total');
-
-    // Upsert invoices as projects and compute per-company totals
-    const companyInvoiceTotals = {}; // companyId -> { total, lastDate }
-
-    for (const invoice of dineroInvoices) {
-      const invoiceGuid = invoice.Guid || invoice.guid;
-      const contactGuid = invoice.ContactGuid || invoice.contactGuid;
-      const companyId = contactIdMap[contactGuid];
-      if (!invoiceGuid || !companyId) continue;
-
-      const amount = invoice.TotalInclVat ?? invoice.totalInclVat ??
-                     invoice.TotalAmount ?? invoice.totalAmount ??
-                     invoice.TotalExclVat ?? invoice.totalExclVat ?? 0;
-      const invoiceDate = invoice.Date || invoice.date ||
-                          invoice.InvoiceDate || invoice.invoiceDate || null;
-      const description = invoice.Description || invoice.description ||
-                          invoice.Comment || invoice.comment || null;
-      const invoiceNumber = invoice.Number || invoice.number || null;
-
-      const projectData = {
-        company_id: companyId,
-        dinero_invoice_id: invoiceGuid,
-        name: invoiceNumber ? `Faktura #${invoiceNumber}` : 'Dinero faktura',
-        amount_dkk: amount,
-        invoice_date: invoiceDate,
-        description,
-      };
-
-      // Check if project already exists
-      const { data: existingProject } = await db
-        .from('projects')
-        .select('id')
-        .eq('dinero_invoice_id', invoiceGuid)
-        .maybeSingle();
-
-      if (existingProject) {
-        await db
-          .from('projects')
-          .update(projectData)
-          .eq('id', existingProject.id);
-      } else {
-        await db
-          .from('projects')
-          .insert(projectData);
-      }
-
-      invoicesUpserted++;
-
-      // Track totals per company
-      if (!companyInvoiceTotals[companyId]) {
-        companyInvoiceTotals[companyId] = { total: 0, lastDate: null };
-      }
-      companyInvoiceTotals[companyId].total += Number(amount) || 0;
-      const dateVal = invoiceDate ? new Date(invoiceDate) : null;
-      if (dateVal && (!companyInvoiceTotals[companyId].lastDate ||
-          dateVal > companyInvoiceTotals[companyId].lastDate)) {
-        companyInvoiceTotals[companyId].lastDate = dateVal;
-      }
-    }
-
-    // Update company totals and auto-promote to client if invoiced > 0
-    for (const [companyId, totals] of Object.entries(companyInvoiceTotals)) {
-      const updateData = {
-        total_invoiced_dkk: totals.total,
-        last_invoice_date: totals.lastDate?.toISOString()?.slice(0, 10) || null,
-      };
-      if (totals.total > 0) {
-        updateData.type = 'client';
-      }
+    if (matchedCompany) {
       await db
         .from('companies')
-        .update(updateData)
-        .eq('id', companyId);
+        .update({
+          total_invoiced_dkk: detail.TotalExclVat,
+          last_invoice_date: detail.Date,
+          type: 'client',
+        })
+        .eq('id', matchedCompany.id);
+      invoicesUpserted = 1;
+      console.log('[Sync] Updated company:', matchedCompany.name, 'total:', detail.TotalExclVat);
+    } else {
+      console.log('[Sync] No matching company found for ContactGuid:', detail.ContactGuid);
     }
 
     console.log('[Sync] Upsert complete');
