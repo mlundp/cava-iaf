@@ -125,17 +125,13 @@ router.get('/sync', async (_req, res) => {
     const contactIdMap = {};
 
     // Upsert contacts as companies — only customers (IsDebtor)
+    if (dineroContacts.length > 0) {
+      console.log('[Sync] First contact sample:', JSON.stringify(dineroContacts[0]));
+    }
     for (const contact of dineroContacts) {
       const contactGuid = contact.ContactGuid || contact.contactGuid;
       const name = contact.Name || contact.name;
       if (!contactGuid || !name) continue;
-
-      // Only sync customers (debitors), skip suppliers and others
-      const isDebtor = contact.IsDebtor ?? contact.isDebtor ?? contact.IsDebitor ?? contact.isDebitor ?? false;
-      if (!isDebtor) {
-        contactsSkipped++;
-        continue;
-      }
 
       const row = {
         dinero_contact_id: contactGuid,
