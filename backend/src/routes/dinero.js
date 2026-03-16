@@ -211,13 +211,31 @@ router.post('/sync-invoices/:contactGuid', async (req, res) => {
 
     console.log('[InvoiceSync] Fetching invoices for contactGuid:', contactGuid);
 
-    // Step 1: Fetch all invoices from list endpoint (returns Guid, ContactName, Date, etc.)
+    // Step 1: Fetch invoice list (returns Guid, ContactName, Date, Description)
     const allInvoices = await fetchAllPages(authHeader, '/invoices');
     console.log('[InvoiceSync] Total invoices fetched:', allInvoices.length);
 
-    // Step 2: Fetch detail for each invoice to get ContactGuid and TotalExclVat
+    // Step 2: Get company name from Supabase for pre-filtering
+    const { data: company } = await db
+      .from('companies')
+      .select('id, name')
+      .eq('dinero_contact_id', contactGuid)
+      .maybeSingle();
+
+    const companyName = company?.name;
+
+    // Step 3: Pre-filter by ContactName to avoid fetching details for all invoices
+    const filtered = companyName
+      ? allInvoices.filter(inv => {
+          const name = inv.ContactName || inv.contactName || '';
+          return name === companyName;
+        })
+      : allInvoices;
+    console.log('[InvoiceSync] Invoices after name pre-filter:', filtered.length);
+
+    // Step 4: Fetch detail only for pre-filtered invoices to get ContactGuid and TotalExclVat
     const matchingInvoices = [];
-    for (const inv of allInvoices) {
+    for (const inv of filtered) {
       const guid = inv.Guid || inv.guid;
       if (!guid) continue;
 
@@ -227,7 +245,6 @@ router.post('/sync-invoices/:contactGuid', async (req, res) => {
       );
       const detail = detailRes.data;
 
-      // Step 3: Filter by ContactGuid
       if (detail.ContactGuid === contactGuid) {
         matchingInvoices.push(detail);
       }
@@ -248,7 +265,7 @@ router.post('/sync-invoices/:contactGuid', async (req, res) => {
       }
     }
 
-    // Step 5: Update company in Supabase
+    // Step 6: Update company in Supabase
     const updateData = {
       total_invoiced_dkk: totalExclVat,
       last_invoice_date: latestDate,
@@ -257,12 +274,6 @@ router.post('/sync-invoices/:contactGuid', async (req, res) => {
       updateData.type = 'client';
     }
 
-    const { data: company } = await db
-      .from('companies')
-      .select('id, name')
-      .eq('dinero_contact_id', contactGuid)
-      .maybeSingle();
-
     if (company) {
       await db.from('companies').update(updateData).eq('id', company.id);
       console.log('[InvoiceSync] Updated company:', company.name, 'total:', totalExclVat);
@@ -270,7 +281,7 @@ router.post('/sync-invoices/:contactGuid', async (req, res) => {
       console.log('[InvoiceSync] No company found for contactGuid:', contactGuid);
     }
 
-    // Step 6: Return results
+    // Step 7: Return results
     res.json({
       success: true,
       total_invoiced_dkk: totalExclVat,
