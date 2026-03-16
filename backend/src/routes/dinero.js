@@ -211,46 +211,37 @@ router.post('/sync-invoices/:contactGuid', async (req, res) => {
 
     console.log('[SyncInvoices] Fetching invoices for contact:', contactGuid);
 
-    // Fetch all invoices and filter by ContactGuid client-side
-    // (list endpoint doesn't return ContactGuid, so fetch details individually)
-    const allInvoices = await fetchAllPages(authHeader, '/invoices');
+    // Fetch invoice list with needed fields in a single call
+    const allInvoices = await fetchAllPages(authHeader, '/invoices?fields=ContactGuid,TotalInclVat,Date&pageSize=1000');
     console.log('[SyncInvoices] Total invoices in list:', allInvoices.length);
 
-    // Fetch detail for each invoice to get ContactGuid and amounts
-    let totalExclVat = 0;
+    // Filter client-side by ContactGuid and accumulate totals
+    let totalInclVat = 0;
     let latestDate = null;
     let invoicesCount = 0;
 
     for (const inv of allInvoices) {
-      const guid = inv.Guid || inv.guid;
-      if (!guid) continue;
+      const invContactGuid = inv.ContactGuid || inv.contactGuid;
+      if (invContactGuid !== contactGuid) continue;
 
-      const detailRes = await axios.get(
-        `${DINERO_BASE}/${DINERO_ORG_ID}/invoices/${guid}`,
-        { headers: { 'Authorization': authHeader } }
-      );
-      const detail = detailRes.data;
-
-      if (detail.ContactGuid !== contactGuid) continue;
-
-      const amount = detail.TotalExclVat || 0;
-      totalExclVat += Number(amount);
+      const amount = inv.TotalInclVat || inv.totalInclVat || 0;
+      totalInclVat += Number(amount);
       invoicesCount++;
 
-      const invoiceDate = detail.Date || null;
+      const invoiceDate = inv.Date || inv.date || null;
       if (invoiceDate && (!latestDate || invoiceDate > latestDate)) {
         latestDate = invoiceDate;
       }
     }
 
-    console.log('[SyncInvoices] Matched invoices:', invoicesCount, 'total:', totalExclVat);
+    console.log('[SyncInvoices] Matched invoices:', invoicesCount, 'total:', totalInclVat);
 
     // Update company in Supabase
     const updateData = {
-      total_invoiced_dkk: totalExclVat,
+      total_invoiced_dkk: totalInclVat,
       last_invoice_date: latestDate,
     };
-    if (totalExclVat > 0) {
+    if (totalInclVat > 0) {
       updateData.type = 'client';
     }
 
@@ -262,12 +253,12 @@ router.post('/sync-invoices/:contactGuid', async (req, res) => {
 
     if (company) {
       await db.from('companies').update(updateData).eq('id', company.id);
-      console.log('[SyncInvoices] Updated company:', company.name, 'total:', totalExclVat);
+      console.log('[SyncInvoices] Updated company:', company.name, 'total:', totalInclVat);
     }
 
     res.json({
       success: true,
-      total_invoiced_dkk: totalExclVat,
+      total_invoiced_dkk: totalInclVat,
       last_invoice_date: latestDate,
       invoices_count: invoicesCount,
     });
