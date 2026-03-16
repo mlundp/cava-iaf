@@ -146,7 +146,7 @@ export default function CompanyDetail() {
       </div>
 
       <div style={cardStyle}>
-        {activeTab === 'info' && <InfoTab company={company} />}
+        {activeTab === 'info' && <InfoTab company={company} onCompanyUpdated={fetchCompany} />}
         {activeTab === 'kontakter' && (
           <KontakterTab contacts={contacts} onAdd={() => { setEditingContact(null); setShowContactForm(true); }} onEdit={(c) => { setEditingContact(c); setShowContactForm(true); }} onDelete={deleteContact} />
         )}
@@ -160,7 +160,26 @@ export default function CompanyDetail() {
   );
 }
 
-function InfoTab({ company }) {
+function InfoTab({ company, onCompanyUpdated }) {
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState(null);
+
+  const syncInvoices = async () => {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const res = await fetch(`/api/dinero/sync-invoices/${company.dinero_contact_id}`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Ukendt fejl');
+      setSyncMsg('Opdateret');
+      onCompanyUpdated();
+    } catch (err) {
+      setSyncMsg(`Fejl: ${err.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const fields = [
     { label: 'CVR-nummer', value: company.cvr_number },
     { label: 'Branche', value: company.industry },
@@ -183,6 +202,14 @@ function InfoTab({ company }) {
           </div>
         ))}
       </div>
+      {company.dinero_contact_id && (
+        <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={syncInvoices} disabled={syncing} style={{ ...secondaryBtnStyle, opacity: syncing ? 0.6 : 1 }}>
+            {syncing ? 'Synkroniserer...' : 'Synkroniser fakturaer'}
+          </button>
+          {syncMsg && <span style={{ fontSize: 13, color: syncMsg.startsWith('Fejl') ? '#dc2626' : '#059669', fontWeight: 500 }}>{syncMsg}</span>}
+        </div>
+      )}
       {company.notes && (
         <div style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid var(--border-subtle)' }}>
           <div style={{ fontSize: 12, color: 'var(--text-faint)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 5 }}>Noter</div>

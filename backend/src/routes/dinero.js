@@ -177,38 +177,6 @@ router.get('/sync', async (_req, res) => {
       }
     }
 
-    // Test with one invoice: fetch detail and update matching company
-    console.log('[Sync] Starting single invoice test...');
-    const testGuid = '45f3216f-5674-4396-b82a-1d2b6eaeae74';
-    const detailRes = await axios.get(
-      `${DINERO_BASE}/${DINERO_ORG_ID}/invoices/${testGuid}`,
-      { headers: { 'Authorization': authHeader } }
-    );
-    const detail = detailRes.data;
-    console.log('[Debug] Invoice detail:', JSON.stringify(detail, null, 2));
-
-    // Find matching company in Supabase
-    const { data: matchedCompany } = await db
-      .from('companies')
-      .select('id, name')
-      .eq('dinero_contact_id', detail.ContactGuid)
-      .maybeSingle();
-
-    if (matchedCompany) {
-      await db
-        .from('companies')
-        .update({
-          total_invoiced_dkk: detail.TotalExclVat,
-          last_invoice_date: detail.Date,
-          type: 'client',
-        })
-        .eq('id', matchedCompany.id);
-      invoicesUpserted = 1;
-      console.log('[Sync] Updated company:', matchedCompany.name, 'total:', detail.TotalExclVat);
-    } else {
-      console.log('[Sync] No matching company found for ContactGuid:', detail.ContactGuid);
-    }
-
     console.log('[Sync] Upsert complete');
 
     lastSyncTime = new Date().toISOString();
@@ -234,6 +202,84 @@ router.get('/sync', async (_req, res) => {
       success: false,
       error: errorMsg,
     });
+  }
+});
+
+// POST /api/dinero/sync-invoices/:contactGuid
+router.post('/sync-invoices/:contactGuid', async (req, res) => {
+  try {
+    const db = getSupabase();
+    const authHeader = await getDineroAuthHeader();
+    const { contactGuid } = req.params;
+
+    console.log('[SyncInvoices] Fetching invoices for contact:', contactGuid);
+
+    // Fetch all invoices and filter by ContactGuid client-side
+    // (list endpoint doesn't return ContactGuid, so fetch details individually)
+    const allInvoices = await fetchAllPages(authHeader, '/invoices');
+    console.log('[SyncInvoices] Total invoices in list:', allInvoices.length);
+
+    // Fetch detail for each invoice to get ContactGuid and amounts
+    let totalExclVat = 0;
+    let latestDate = null;
+    let invoicesCount = 0;
+
+    for (const inv of allInvoices) {
+      const guid = inv.Guid || inv.guid;
+      if (!guid) continue;
+
+      const detailRes = await axios.get(
+        `${DINERO_BASE}/${DINERO_ORG_ID}/invoices/${guid}`,
+        { headers: { 'Authorization': authHeader } }
+      );
+      const detail = detailRes.data;
+
+      if (detail.ContactGuid !== contactGuid) continue;
+
+      const amount = detail.TotalExclVat || 0;
+      totalExclVat += Number(amount);
+      invoicesCount++;
+
+      const invoiceDate = detail.Date || null;
+      if (invoiceDate && (!latestDate || invoiceDate > latestDate)) {
+        latestDate = invoiceDate;
+      }
+    }
+
+    console.log('[SyncInvoices] Matched invoices:', invoicesCount, 'total:', totalExclVat);
+
+    // Update company in Supabase
+    const updateData = {
+      total_invoiced_dkk: totalExclVat,
+      last_invoice_date: latestDate,
+    };
+    if (totalExclVat > 0) {
+      updateData.type = 'client';
+    }
+
+    const { data: company } = await db
+      .from('companies')
+      .select('id, name')
+      .eq('dinero_contact_id', contactGuid)
+      .maybeSingle();
+
+    if (company) {
+      await db.from('companies').update(updateData).eq('id', company.id);
+      console.log('[SyncInvoices] Updated company:', company.name, 'total:', totalExclVat);
+    }
+
+    res.json({
+      success: true,
+      total_invoiced_dkk: totalExclVat,
+      last_invoice_date: latestDate,
+      invoices_count: invoicesCount,
+    });
+  } catch (err) {
+    console.error('[SyncInvoices] ERROR:', err.message, err.stack);
+    const detail = err.response?.data;
+    const errorMsg = typeof detail === 'string' ? detail
+      : detail?.message || detail?.error_description || detail?.error || err.message;
+    res.status(500).json({ success: false, error: errorMsg });
   }
 });
 
