@@ -134,3 +134,31 @@ export const activityIcons = {
   contract_signed: IconDocCheck,
   other: IconChat,
 };
+
+export function IconPin({ size = 16, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" style={base}>
+      <path d="M12 17v5"/>
+      <path d="M9 11V4a1 1 0 011-1h4a1 1 0 011 1v7"/>
+      <path d="M5 17h14"/>
+      <path d="M7 11l-2 6h14l-2-6"/>
+    </svg>
+  );
+}
+
+export function IconTrash({ size = 16, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" style={base}>
+      <polyline points="3 6 5 6 21 6"/>
+      <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+    </svg>
+  );
+}
+
+export function IconPaperclip({ size = 16, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" style={base}>
+      <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+    </svg>
+  );
+}
