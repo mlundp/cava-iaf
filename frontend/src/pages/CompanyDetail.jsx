@@ -430,16 +430,25 @@ function LogEntryForm({ companyId, initial, onDone, onCancel }) {
     let attachments = initial?.attachments || [];
     if (files.length > 0) {
       setUploading(true);
+      console.log('[LogEntry] Files selected for upload:', files.map(f => f.name));
       for (const file of files) {
         const path = `${companyId}/${Date.now()}-${file.name}`;
-        const { error } = await supabase.storage.from('attachments').upload(path, file);
-        if (!error) {
-          const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(path);
-          attachments = [...attachments, { url: urlData.publicUrl, filename: file.name }];
+        console.log('[LogEntry] Uploading file:', file.name, 'to path:', path);
+        const { data: uploadData, error: uploadError } = await supabase.storage.from('attachments').upload(path, file);
+        console.log('[LogEntry] Upload result:', { uploadData, uploadError: uploadError?.message });
+        if (uploadError) {
+          console.error('[LogEntry] Upload failed for', file.name, ':', uploadError.message);
+          alert(`Upload fejl for ${file.name}: ${uploadError.message}`);
+          continue;
         }
+        const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(path);
+        console.log('[LogEntry] Public URL:', urlData.publicUrl);
+        attachments = [...attachments, { url: urlData.publicUrl, filename: file.name }];
       }
       setUploading(false);
     }
+
+    console.log('[LogEntry] Final payload attachments:', attachments);
 
     try {
       if (isEdit) {
