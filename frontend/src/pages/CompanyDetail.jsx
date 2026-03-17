@@ -445,6 +445,7 @@ function OpslagstavlenTab({ companyId, entries, onRefresh }) {
     }
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
       const res = await fetch(`${API_URL}/api/companies/${companyId}/log`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -453,6 +454,7 @@ function OpslagstavlenTab({ companyId, entries, onRefresh }) {
           notes: form.notes.trim() || null,
           occurred_at: form.occurred_at,
           attachments,
+          logged_by: user?.email || null,
         }),
       });
       const data = await res.json();
