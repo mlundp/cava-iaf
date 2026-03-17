@@ -314,6 +314,34 @@ router.post('/sync-invoices/:contactGuid', async (req, res) => {
   }
 });
 
+// GET /api/dinero/contacts/:contactGuid
+router.get('/contacts/:contactGuid', async (req, res) => {
+  try {
+    const { contactGuid } = req.params;
+    console.log('[DineroContact] Fetching contact:', contactGuid);
+
+    const authHeader = await getDineroAuthHeader();
+    const { data } = await axios.get(
+      `${DINERO_BASE}/${DINERO_ORG_ID}/contacts/${contactGuid}`,
+      { headers: { 'Authorization': authHeader } }
+    );
+
+    res.json({
+      success: true,
+      Name: data.Name,
+      Email: data.Email,
+      Phone: data.Phone,
+      ExternalReference: data.ExternalReference,
+    });
+  } catch (err) {
+    console.error('[DineroContact] ERROR:', err.message);
+    const detail = err.response?.data;
+    const errorMsg = typeof detail === 'string' ? detail
+      : detail?.message || detail?.error_description || detail?.error || err.message;
+    res.status(500).json({ success: false, error: errorMsg });
+  }
+});
+
 // GET /api/dinero/status
 router.get('/status', (_req, res) => {
   res.json({
