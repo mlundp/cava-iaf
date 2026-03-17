@@ -294,11 +294,40 @@ router.post('/sync-invoices/:contactGuid', async (req, res) => {
     if (company) {
       await db.from('companies').update(updateData).eq('id', company.id);
       console.log('[InvoiceSync] Updated company:', company.name, 'total:', totalExclVat);
+
+      // Step 7: Fetch contact detail from Dinero and extract CVR number
+      try {
+        const contactRes = await axios.get(
+          `${DINERO_BASE}/${DINERO_ORG_ID}/contacts/${contactGuid}`,
+          { headers: { 'Authorization': authHeader } }
+        );
+        const contactDetail = contactRes.data;
+        console.log('[InvoiceSync] Contact detail fields:', JSON.stringify(contactDetail, null, 2));
+
+        // Look for CVR number in likely fields
+        const cvrCandidate = contactDetail.ExternalReference || contactDetail.VatNumber || contactDetail.vatNumber || contactDetail.externalReference || '';
+        const cvrMatch = String(cvrCandidate).match(/^\d{8}$/);
+
+        if (cvrMatch) {
+          // Only set cvr_number if currently null/empty
+          const { data: current } = await db.from('companies').select('cvr_number').eq('id', company.id).single();
+          if (!current?.cvr_number) {
+            await db.from('companies').update({ cvr_number: cvrMatch[0] }).eq('id', company.id);
+            console.log('[InvoiceSync] Saved CVR number:', cvrMatch[0], 'for', company.name);
+          } else {
+            console.log('[InvoiceSync] CVR already set:', current.cvr_number, '— skipping');
+          }
+        } else {
+          console.log('[InvoiceSync] No 8-digit CVR found in contact detail. Candidate value:', cvrCandidate);
+        }
+      } catch (contactErr) {
+        console.error('[InvoiceSync] Failed to fetch contact detail:', contactErr.message);
+      }
     } else {
       console.log('[InvoiceSync] No company found for contactGuid:', contactGuid);
     }
 
-    // Step 7: Return results
+    // Step 8: Return results
     res.json({
       success: true,
       total_invoiced_dkk: totalExclVat,
