@@ -111,7 +111,7 @@ export default function Logbog() {
             const ac = activityColors[entry.activity_type] || activityColors.other;
             const Icon = activityIcons[entry.activity_type] || IconChat;
             return (
-              <div key={entry.id} style={{ padding: '16px 20px', borderBottom: i < filtered.length - 1 ? '1px solid var(--border-subtle)' : 'none', transition: 'background-color 0.1s ease' }}
+              <div key={entry.id} onClick={() => { if (entry.company_id) navigate(`/kontakter/${entry.company_id}?tab=opslagstavlen&entry=${entry.id}`); }} style={{ padding: '16px 20px', borderBottom: i < filtered.length - 1 ? '1px solid var(--border-subtle)' : 'none', transition: 'background-color 0.1s ease', cursor: 'pointer' }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}
               >
@@ -123,7 +123,7 @@ export default function Logbog() {
                         {activityLabels[entry.activity_type] || entry.activity_type}
                       </span>
                       {entry.companies?.name && (
-                        <span onClick={() => navigate(`/kontakter/${entry.companies.id}`)} style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', cursor: 'pointer', transition: 'color 0.15s ease' }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
                           {entry.companies.name}
                         </span>
                       )}
