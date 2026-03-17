@@ -412,25 +412,22 @@ const activityTypeOptions = [
   { value: 'other', label: 'Andet' },
 ];
 
-function OpslagstavlenTab({ companyId, entries, onRefresh }) {
-  const [showForm, setShowForm] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ activity_type: 'other', notes: '', occurred_at: new Date().toISOString().slice(0, 10) });
+function LogEntryForm({ companyId, initial, onDone, onCancel }) {
+  const [form, setForm] = useState({
+    activity_type: initial?.activity_type || 'other',
+    notes: initial?.notes || '',
+    occurred_at: initial?.occurred_at ? initial.occurred_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
+  });
   const [files, setFiles] = useState([]);
+  const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-
-  const resetForm = () => {
-    setForm({ activity_type: 'other', notes: '', occurred_at: new Date().toISOString().slice(0, 10) });
-    setFiles([]);
-    setShowForm(false);
-  };
+  const isEdit = !!initial?.id;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
 
-    // Upload files to Supabase Storage
-    let attachments = [];
+    let attachments = initial?.attachments || [];
     if (files.length > 0) {
       setUploading(true);
       for (const file of files) {
@@ -438,29 +435,32 @@ function OpslagstavlenTab({ companyId, entries, onRefresh }) {
         const { error } = await supabase.storage.from('attachments').upload(path, file);
         if (!error) {
           const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(path);
-          attachments.push({ url: urlData.publicUrl, filename: file.name });
+          attachments = [...attachments, { url: urlData.publicUrl, filename: file.name }];
         }
       }
       setUploading(false);
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const res = await fetch(`${API_URL}/api/companies/${companyId}/log`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          activity_type: form.activity_type,
-          notes: form.notes.trim() || null,
-          occurred_at: form.occurred_at,
-          attachments,
-          logged_by: user?.email || null,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || 'Ukendt fejl');
-      resetForm();
-      onRefresh();
+      if (isEdit) {
+        const res = await fetch(`${API_URL}/api/companies/${companyId}/log/${initial.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ activity_type: form.activity_type, notes: form.notes.trim() || null, occurred_at: form.occurred_at, attachments }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || 'Ukendt fejl');
+      } else {
+        const { data: { user } } = await supabase.auth.getUser();
+        const res = await fetch(`${API_URL}/api/companies/${companyId}/log`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ activity_type: form.activity_type, notes: form.notes.trim() || null, occurred_at: form.occurred_at, attachments, logged_by: user?.email || null }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || 'Ukendt fejl');
+      }
+      onDone();
     } catch (err) {
       alert(`Fejl: ${err.message}`);
     } finally {
@@ -469,42 +469,84 @@ function OpslagstavlenTab({ companyId, entries, onRefresh }) {
   };
 
   return (
+    <form onSubmit={handleSubmit} style={{ ...logCardStyle, marginBottom: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <label style={contactEditLabelStyle}>
+          Type
+          <select value={form.activity_type} onChange={(e) => setForm((p) => ({ ...p, activity_type: e.target.value }))} style={contactEditInputStyle}>
+            {activityTypeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </label>
+        <label style={contactEditLabelStyle}>
+          Dato
+          <input type="date" value={form.occurred_at} onChange={(e) => setForm((p) => ({ ...p, occurred_at: e.target.value }))} style={contactEditInputStyle} />
+        </label>
+      </div>
+      <label style={{ ...contactEditLabelStyle, marginTop: 14 }}>
+        Noter
+        <textarea value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} rows={3} style={{ ...contactEditInputStyle, resize: 'vertical' }} />
+      </label>
+      <label style={{ ...contactEditLabelStyle, marginTop: 14 }}>
+        Vedhæftninger
+        <input type="file" multiple onChange={(e) => setFiles(Array.from(e.target.files))} style={{ fontSize: 13, color: 'var(--text-secondary)' }} />
+      </label>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+        <button type="button" onClick={onCancel} style={{ ...secondaryBtnStyle, padding: '6px 14px', fontSize: 12 }}>Annuller</button>
+        <button type="submit" disabled={saving || uploading} style={{ ...primaryBtnSmallStyle, opacity: (saving || uploading) ? 0.7 : 1 }}>
+          {uploading ? 'Uploader...' : saving ? 'Gemmer...' : isEdit ? 'Gem' : 'Opret'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function OpslagstavlenTab({ companyId, entries, onRefresh }) {
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [expandedAttachments, setExpandedAttachments] = useState({});
+
+  const deleteEntry = async (entryId) => {
+    if (!window.confirm('Slet denne note?')) return;
+    try {
+      const res = await fetch(`${API_URL}/api/companies/${companyId}/log/${entryId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Ukendt fejl');
+      onRefresh();
+    } catch (err) {
+      alert(`Fejl: ${err.message}`);
+    }
+  };
+
+  const togglePin = async (entry) => {
+    try {
+      const res = await fetch(`${API_URL}/api/companies/${companyId}/log/${entry.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pinned: !entry.pinned }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Ukendt fejl');
+      onRefresh();
+    } catch (err) {
+      alert(`Fejl: ${err.message}`);
+    }
+  };
+
+  const toggleAttachments = (id) => {
+    setExpandedAttachments((p) => ({ ...p, [id]: !p[id] }));
+  };
+
+  return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Opslagstavlen</h3>
-        <button onClick={() => setShowForm(!showForm)} style={primaryBtnSmallStyle}>
+        <button onClick={() => { setShowForm(!showForm); setEditingId(null); }} style={primaryBtnSmallStyle}>
           {showForm ? 'Annuller' : '+ Ny note'}
         </button>
       </div>
 
-      {showForm && (
-        <form onSubmit={handleSubmit} style={{ ...logCardStyle, marginBottom: 18 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <label style={contactEditLabelStyle}>
-              Type
-              <select name="activity_type" value={form.activity_type} onChange={(e) => setForm((p) => ({ ...p, activity_type: e.target.value }))} style={contactEditInputStyle}>
-                {activityTypeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </label>
-            <label style={contactEditLabelStyle}>
-              Dato
-              <input type="date" value={form.occurred_at} onChange={(e) => setForm((p) => ({ ...p, occurred_at: e.target.value }))} style={contactEditInputStyle} />
-            </label>
-          </div>
-          <label style={{ ...contactEditLabelStyle, marginTop: 14 }}>
-            Noter
-            <textarea value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} rows={3} style={{ ...contactEditInputStyle, resize: 'vertical' }} />
-          </label>
-          <label style={{ ...contactEditLabelStyle, marginTop: 14 }}>
-            Vedhæftninger
-            <input type="file" multiple onChange={(e) => setFiles(Array.from(e.target.files))} style={{ fontSize: 13, color: 'var(--text-secondary)' }} />
-          </label>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
-            <button type="submit" disabled={saving || uploading} style={{ ...primaryBtnSmallStyle, opacity: (saving || uploading) ? 0.7 : 1 }}>
-              {uploading ? 'Uploader...' : saving ? 'Gemmer...' : 'Opret'}
-            </button>
-          </div>
-        </form>
+      {showForm && !editingId && (
+        <LogEntryForm companyId={companyId} onDone={() => { setShowForm(false); onRefresh(); }} onCancel={() => setShowForm(false)} />
       )}
 
       {entries.length === 0 ? (
@@ -514,24 +556,43 @@ function OpslagstavlenTab({ companyId, entries, onRefresh }) {
           {entries.map((entry) => {
             const ac = activityColors[entry.activity_type] || activityColors.other;
             const Icon = activityIcons[entry.activity_type] || IconChat;
-            const attachments = entry.attachments || [];
+            const atts = entry.attachments || [];
+            const isExpanded = expandedAttachments[entry.id];
+
+            if (editingId === entry.id) {
+              return <LogEntryForm key={entry.id} companyId={companyId} initial={entry} onDone={() => { setEditingId(null); onRefresh(); }} onCancel={() => setEditingId(null)} />;
+            }
+
             return (
               <div key={entry.id} style={logCardStyle}>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 6 }}>
-                  <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, backgroundColor: ac.bg, color: ac.color, border: `1px solid ${ac.border}`, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                    <Icon size={13} color={ac.color} />
-                    {activityLabels[entry.activity_type] || entry.activity_type}
-                  </span>
-                  <span style={{ fontSize: 13, color: 'var(--text-faint)' }}>
-                    {new Date(entry.occurred_at).toLocaleDateString('da-DK')}
-                  </span>
-                  {entry.logged_by && <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{entry.logged_by}</span>}
-                  {entry.contacts?.name && <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>{entry.contacts.name}</span>}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {entry.pinned && <span title="Fastgjort" style={{ fontSize: 14 }}>&#x1F4CC;</span>}
+                    <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, backgroundColor: ac.bg, color: ac.color, border: `1px solid ${ac.border}`, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                      <Icon size={13} color={ac.color} />
+                      {activityLabels[entry.activity_type] || entry.activity_type}
+                    </span>
+                    <span style={{ fontSize: 13, color: 'var(--text-faint)' }}>
+                      {new Date(entry.occurred_at).toLocaleDateString('da-DK')}
+                    </span>
+                    {entry.logged_by && <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{entry.logged_by}</span>}
+                    {entry.contacts?.name && <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>{entry.contacts.name}</span>}
+                    {atts.length > 0 && (
+                      <button onClick={() => toggleAttachments(entry.id)} style={{ ...logIconBtnStyle, color: 'var(--text-muted)' }} title="Se vedhæftede">
+                        &#x1F4CE; {atts.length}
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                    <button onClick={() => togglePin(entry)} style={{ ...logIconBtnStyle, color: entry.pinned ? 'var(--accent)' : 'var(--text-placeholder)' }} title={entry.pinned ? 'Fjern fastgørelse' : 'Fastgør'}>&#x1F4CC;</button>
+                    <button onClick={() => { setEditingId(entry.id); setShowForm(false); }} style={{ ...logIconBtnStyle, color: 'var(--text-muted)' }} title="Rediger">&#x270F;&#xFE0E;</button>
+                    <button onClick={() => deleteEntry(entry.id)} style={{ ...logIconBtnStyle, color: '#ef4444' }} title="Slet">&#x1F5D1;&#xFE0E;</button>
+                  </div>
                 </div>
-                {entry.notes && <p style={{ margin: '0 0 4px', fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{entry.notes}</p>}
-                {attachments.length > 0 && (
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
-                    {attachments.map((att, i) => (
+                {entry.notes && <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{entry.notes}</p>}
+                {isExpanded && atts.length > 0 && (
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
+                    {atts.map((att, i) => (
                       <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none', padding: '3px 8px', backgroundColor: 'var(--bg-input)', borderRadius: 6, border: '1px solid var(--border-subtle)' }}>
                         {att.filename}
                       </a>
@@ -552,6 +613,7 @@ const secondaryBtnStyle = { backgroundColor: 'var(--bg-card)', color: 'var(--tex
 const deleteBtnStyle = { backgroundColor: 'var(--bg-card)', color: '#dc2626', border: '1px solid #fecaca', padding: '9px 18px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', transition: 'all 0.15s ease' };
 const primaryBtnSmallStyle = { backgroundColor: 'var(--accent)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', transition: 'background-color 0.15s ease' };
 const logCardStyle = { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
+const logIconBtnStyle = { background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '2px 4px', fontFamily: 'inherit', lineHeight: 1, borderRadius: 4, transition: 'opacity 0.15s ease' };
 const actionBtnStyle = { background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--accent)', fontWeight: 500, padding: 0, fontFamily: 'inherit', transition: 'color 0.15s ease' };
 const contactCardStyle = { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', transition: 'box-shadow 0.15s ease, opacity 0.15s ease' };
 const dragHandleStyle = { cursor: 'grab', color: 'var(--text-placeholder)', fontSize: 18, lineHeight: '1', display: 'flex', alignItems: 'center', userSelect: 'none', padding: '0 2px', flexShrink: 0 };

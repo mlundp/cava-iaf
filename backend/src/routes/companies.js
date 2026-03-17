@@ -20,12 +20,21 @@ router.get('/:companyId/log', async (req, res) => {
     const db = getSupabase();
     const { companyId } = req.params;
 
-    const { data, error } = await db
+    let { data, error } = await db
       .from('log_entries')
       .select('*, contacts(name)')
       .eq('company_id', companyId)
+      .order('pinned', { ascending: false })
       .order('occurred_at', { ascending: false });
 
+    if (error) {
+      // Fallback if pinned column doesn't exist yet
+      ({ data, error } = await db
+        .from('log_entries')
+        .select('*, contacts(name)')
+        .eq('company_id', companyId)
+        .order('occurred_at', { ascending: false }));
+    }
     if (error) {
       return res.status(500).json({ success: false, error: error.message });
     }
@@ -66,6 +75,53 @@ router.post('/:companyId/log', async (req, res) => {
     res.json({ success: true, entry: data });
   } catch (err) {
     console.error('[CompanyLog] POST error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PATCH /api/companies/:companyId/log/:entryId
+router.patch('/:companyId/log/:entryId', async (req, res) => {
+  try {
+    const db = getSupabase();
+    const { entryId } = req.params;
+    const updates = req.body;
+
+    const { data, error } = await db
+      .from('log_entries')
+      .update(updates)
+      .eq('id', entryId)
+      .select('*, contacts(name)')
+      .single();
+
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    res.json({ success: true, entry: data });
+  } catch (err) {
+    console.error('[CompanyLog] PATCH error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/companies/:companyId/log/:entryId
+router.delete('/:companyId/log/:entryId', async (req, res) => {
+  try {
+    const db = getSupabase();
+    const { entryId } = req.params;
+
+    const { error } = await db
+      .from('log_entries')
+      .delete()
+      .eq('id', entryId);
+
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[CompanyLog] DELETE error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
