@@ -285,6 +285,7 @@ function SortableContactCard({ contact, editingId, editForm, saving, onStartEdit
                 )}
                 {c.phone && <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{c.phone}</span>}
               </div>
+              {c.notes && <div style={{ marginTop: 6, fontSize: 13, color: 'var(--text-faint)', lineHeight: 1.4 }}>{c.notes}</div>}
             </div>
           )}
         </div>
