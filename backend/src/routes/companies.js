@@ -42,7 +42,7 @@ router.post('/:companyId/log', async (req, res) => {
   try {
     const db = getSupabase();
     const { companyId } = req.params;
-    const { activity_type, notes, occurred_at, attachments } = req.body;
+    const { activity_type, notes, occurred_at, attachments, logged_by } = req.body;
 
     const payload = {
       company_id: companyId,
@@ -50,6 +50,7 @@ router.post('/:companyId/log', async (req, res) => {
       notes: notes || null,
       occurred_at: occurred_at || new Date().toISOString(),
       attachments: attachments || [],
+      logged_by: logged_by || null,
     };
 
     const { data, error } = await db
