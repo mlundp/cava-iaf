@@ -5,6 +5,9 @@ import CompanyForm from '../components/CompanyForm';
 import ContactForm from '../components/ContactForm';
 import Skeleton from '../components/Skeleton';
 import { activityIcons, IconChat } from '../components/Icons';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
@@ -59,7 +62,7 @@ export default function CompanyDetail() {
     setCompany(data);
   };
   const fetchContacts = async () => {
-    const { data } = await supabase.from('contacts').select('*').eq('company_id', id).order('is_primary', { ascending: false });
+    const { data } = await supabase.from('contacts').select('*').eq('company_id', id).order('is_primary', { ascending: false }).order('sort_order', { ascending: true });
     setContacts(data || []);
   };
   const fetchProjects = async () => {
@@ -222,11 +225,83 @@ function InfoTab({ company, onCompanyUpdated }) {
   );
 }
 
+function SortableContactCard({ contact, editingId, editForm, saving, onStartEdit, onCancelEdit, onSaveEdit, onEditChange, onDelete }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: contact.id });
+  const style = {
+    ...contactCardStyle,
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+  const c = contact;
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <div style={{ display: 'flex', gap: 12 }}>
+        <div {...attributes} {...listeners} style={dragHandleStyle} title="Træk for at ændre rækkefølge">&#x2807;</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {editingId === c.id ? (
+            <div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <label style={contactEditLabelStyle}>Navn *<input name="name" value={editForm.name} onChange={onEditChange} style={contactEditInputStyle} /></label>
+                <label style={contactEditLabelStyle}>Titel<input name="title" value={editForm.title} onChange={onEditChange} style={contactEditInputStyle} /></label>
+                <label style={contactEditLabelStyle}>Email<input name="email" type="email" value={editForm.email} onChange={onEditChange} style={contactEditInputStyle} /></label>
+                <label style={contactEditLabelStyle}>Telefon<input name="phone" value={editForm.phone} onChange={onEditChange} style={contactEditInputStyle} /></label>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, fontSize: 13, cursor: 'pointer', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                <input name="is_primary" type="checkbox" checked={editForm.is_primary} onChange={onEditChange} style={{ width: 15, height: 15, accentColor: 'var(--accent)', cursor: 'pointer' }} />
+                Primær kontakt
+              </label>
+              <label style={{ ...contactEditLabelStyle, marginTop: 14 }}>Noter
+                <textarea name="notes" value={editForm.notes} onChange={onEditChange} rows={2} style={{ ...contactEditInputStyle, resize: 'vertical' }} />
+              </label>
+              <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
+                <button onClick={onCancelEdit} style={{ ...secondaryBtnStyle, padding: '6px 14px', fontSize: 12 }}>Annuller</button>
+                <button onClick={() => onSaveEdit(c.id)} disabled={saving} style={{ ...primaryBtnSmallStyle, opacity: saving ? 0.7 : 1 }}>{saving ? 'Gemmer...' : 'Gem'}</button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{c.name}</span>
+                  {c.title && <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{c.title}</span>}
+                  {c.is_primary && (
+                    <span style={{ fontSize: 11, fontWeight: 500, color: '#059669', backgroundColor: '#ecfdf5', padding: '2px 8px', borderRadius: 20, border: '1px solid #a7f3d0' }}>Primær</span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                  <button onClick={() => onStartEdit(c)} style={actionBtnStyle}>Rediger</button>
+                  <button onClick={() => onDelete(c.id)} style={{ ...actionBtnStyle, color: '#ef4444' }}>Slet</button>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 20, marginTop: 8 }}>
+                {c.email && (
+                  <a href={`mailto:${c.email}`} style={{ fontSize: 13, color: 'var(--accent)', textDecoration: 'none' }}>{c.email}</a>
+                )}
+                {c.phone && <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{c.phone}</span>}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function KontakterTab({ contacts, company, onAdd, onDelete, onPrefill, onRefresh }) {
   const [fetchingDinero, setFetchingDinero] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [orderedContacts, setOrderedContacts] = useState(contacts);
+
+  useEffect(() => { setOrderedContacts(contacts); }, [contacts]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   const fetchFromDinero = async () => {
     setFetchingDinero(true);
@@ -264,6 +339,26 @@ function KontakterTab({ contacts, company, onAdd, onDelete, onPrefill, onRefresh
     setEditForm((p) => ({ ...p, [name]: type === 'checkbox' ? checked : value }));
   };
 
+  const handleDragEnd = async (event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = orderedContacts.findIndex((c) => c.id === active.id);
+    const newIndex = orderedContacts.findIndex((c) => c.id === over.id);
+    const reordered = arrayMove(orderedContacts, oldIndex, newIndex);
+
+    // Ensure primary contacts stay first: move all primary to the top
+    const primary = reordered.filter((c) => c.is_primary);
+    const nonPrimary = reordered.filter((c) => !c.is_primary);
+    const final = [...primary, ...nonPrimary];
+
+    setOrderedContacts(final);
+
+    // Persist sort_order to Supabase
+    const updates = final.map((c, i) => supabase.from('contacts').update({ sort_order: i }).eq('id', c.id));
+    await Promise.all(updates);
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
@@ -277,60 +372,29 @@ function KontakterTab({ contacts, company, onAdd, onDelete, onPrefill, onRefresh
           <button onClick={onAdd} style={primaryBtnSmallStyle}>+ Tilføj kontakt</button>
         </div>
       </div>
-      {contacts.length === 0 ? (
+      {orderedContacts.length === 0 ? (
         <p style={{ color: 'var(--text-faint)', fontSize: 14 }}>Ingen kontaktpersoner endnu.</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {contacts.map((c) => (
-            <div key={c.id} style={contactCardStyle}>
-              {editingId === c.id ? (
-                <div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                    <label style={contactEditLabelStyle}>Navn *<input name="name" value={editForm.name} onChange={handleEditChange} style={contactEditInputStyle} /></label>
-                    <label style={contactEditLabelStyle}>Titel<input name="title" value={editForm.title} onChange={handleEditChange} style={contactEditInputStyle} /></label>
-                    <label style={contactEditLabelStyle}>Email<input name="email" type="email" value={editForm.email} onChange={handleEditChange} style={contactEditInputStyle} /></label>
-                    <label style={contactEditLabelStyle}>Telefon<input name="phone" value={editForm.phone} onChange={handleEditChange} style={contactEditInputStyle} /></label>
-                  </div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, fontSize: 13, cursor: 'pointer', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                    <input name="is_primary" type="checkbox" checked={editForm.is_primary} onChange={handleEditChange} style={{ width: 15, height: 15, accentColor: 'var(--accent)', cursor: 'pointer' }} />
-                    Primær kontakt
-                  </label>
-                  <label style={{ ...contactEditLabelStyle, marginTop: 14 }}>Noter
-                    <textarea name="notes" value={editForm.notes} onChange={handleEditChange} rows={2} style={{ ...contactEditInputStyle, resize: 'vertical' }} />
-                  </label>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
-                    <button onClick={cancelEdit} style={{ ...secondaryBtnStyle, padding: '6px 14px', fontSize: 12 }}>Annuller</button>
-                    <button onClick={() => saveEdit(c.id)} disabled={saving} style={{ ...primaryBtnSmallStyle, opacity: saving ? 0.7 : 1 }}>{saving ? 'Gemmer...' : 'Gem'}</button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{c.name}</span>
-                      {c.title && <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{c.title}</span>}
-                      {c.is_primary && (
-                        <span style={{ fontSize: 11, fontWeight: 500, color: '#059669', backgroundColor: '#ecfdf5', padding: '2px 8px', borderRadius: 20, border: '1px solid #a7f3d0' }}>Primær</span>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button onClick={() => startEdit(c)} style={actionBtnStyle}>Rediger</button>
-                      <button onClick={() => onDelete(c.id)} style={{ ...actionBtnStyle, color: '#ef4444' }}>Slet</button>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 20, marginTop: 8 }}>
-                    {c.email && (
-                      <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                        <a href={`mailto:${c.email}`} style={{ color: 'var(--accent)', textDecoration: 'none' }}>{c.email}</a>
-                      </span>
-                    )}
-                    {c.phone && <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{c.phone}</span>}
-                  </div>
-                </div>
-              )}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={orderedContacts.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {orderedContacts.map((c) => (
+                <SortableContactCard
+                  key={c.id}
+                  contact={c}
+                  editingId={editingId}
+                  editForm={editForm}
+                  saving={saving}
+                  onStartEdit={startEdit}
+                  onCancelEdit={cancelEdit}
+                  onSaveEdit={saveEdit}
+                  onEditChange={handleEditChange}
+                  onDelete={onDelete}
+                />
+              ))}
             </div>
-          ))}
-        </div>
+          </SortableContext>
+        </DndContext>
       )}
     </div>
   );
@@ -406,6 +470,7 @@ const primaryBtnSmallStyle = { backgroundColor: 'var(--accent)', color: '#fff', 
 const detailThStyle = { padding: '10px 14px', fontSize: 11, fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'left', borderBottom: '1px solid var(--border-subtle)' };
 const detailTdStyle = { padding: '12px 14px', fontSize: 14, color: 'var(--text-secondary)' };
 const actionBtnStyle = { background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--accent)', fontWeight: 500, padding: 0, fontFamily: 'inherit', transition: 'color 0.15s ease' };
-const contactCardStyle = { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '16px 20px', transition: 'box-shadow 0.15s ease' };
+const contactCardStyle = { backgroundColor: 'var(--bg-surface, #fafafa)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 20px', transition: 'box-shadow 0.15s ease, opacity 0.15s ease' };
+const dragHandleStyle = { cursor: 'grab', color: 'var(--text-placeholder)', fontSize: 18, lineHeight: '1', display: 'flex', alignItems: 'center', userSelect: 'none', padding: '0 2px', flexShrink: 0 };
 const contactEditLabelStyle = { display: 'flex', flexDirection: 'column', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', gap: 5 };
 const contactEditInputStyle = { padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 7, fontSize: 13, outline: 'none', fontFamily: 'inherit', color: 'var(--text)', backgroundColor: 'var(--bg-input)' };
