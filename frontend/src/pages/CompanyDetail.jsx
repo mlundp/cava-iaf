@@ -150,7 +150,7 @@ export default function CompanyDetail() {
       <div style={cardStyle}>
         {activeTab === 'info' && <InfoTab company={company} onCompanyUpdated={fetchCompany} />}
         {activeTab === 'kontakter' && (
-          <KontakterTab contacts={contacts} company={company} onAdd={() => { setEditingContact(null); setShowContactForm(true); }} onEdit={(c) => { setEditingContact(c); setShowContactForm(true); }} onDelete={deleteContact} onPrefill={(prefill) => { setEditingContact(prefill); setShowContactForm(true); }} />
+          <KontakterTab contacts={contacts} company={company} onAdd={() => { setEditingContact(null); setShowContactForm(true); }} onDelete={deleteContact} onPrefill={(prefill) => { setEditingContact(prefill); setShowContactForm(true); }} onRefresh={fetchContacts} />
         )}
         {activeTab === 'projekter' && <ProjekterTab projects={projects} />}
         {activeTab === 'logbog' && <LogbogTab entries={logEntries} />}
@@ -222,8 +222,11 @@ function InfoTab({ company, onCompanyUpdated }) {
   );
 }
 
-function KontakterTab({ contacts, company, onAdd, onEdit, onDelete, onPrefill }) {
+function KontakterTab({ contacts, company, onAdd, onDelete, onPrefill, onRefresh }) {
   const [fetchingDinero, setFetchingDinero] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(false);
 
   const fetchFromDinero = async () => {
     setFetchingDinero(true);
@@ -237,6 +240,28 @@ function KontakterTab({ contacts, company, onAdd, onEdit, onDelete, onPrefill })
     } finally {
       setFetchingDinero(false);
     }
+  };
+
+  const startEdit = (c) => {
+    setEditingId(c.id);
+    setEditForm({ name: c.name || '', title: c.title || '', email: c.email || '', phone: c.phone || '', is_primary: c.is_primary || false, notes: c.notes || '' });
+  };
+
+  const cancelEdit = () => { setEditingId(null); setEditForm({}); };
+
+  const saveEdit = async (contactId) => {
+    if (!editForm.name.trim()) return;
+    setSaving(true);
+    const payload = { name: editForm.name.trim(), title: editForm.title.trim() || null, email: editForm.email.trim() || null, phone: editForm.phone.trim() || null, is_primary: editForm.is_primary, notes: editForm.notes.trim() || null };
+    await supabase.from('contacts').update(payload).eq('id', contactId);
+    setSaving(false);
+    setEditingId(null);
+    onRefresh();
+  };
+
+  const handleEditChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setEditForm((p) => ({ ...p, [name]: type === 'checkbox' ? checked : value }));
   };
 
   return (
@@ -255,36 +280,57 @@ function KontakterTab({ contacts, company, onAdd, onEdit, onDelete, onPrefill })
       {contacts.length === 0 ? (
         <p style={{ color: 'var(--text-faint)', fontSize: 14 }}>Ingen kontaktpersoner endnu.</p>
       ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={detailThStyle}>Navn</th><th style={detailThStyle}>Titel</th><th style={detailThStyle}>Email</th>
-              <th style={detailThStyle}>Telefon</th><th style={detailThStyle}>Primær</th><th style={detailThStyle}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {contacts.map((c) => (
-              <tr key={c.id} style={{ borderBottom: '1px solid var(--border-subtle)', transition: 'background-color 0.1s ease' }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}
-              >
-                <td style={{ ...detailTdStyle, fontWeight: 600, color: 'var(--text)' }}>{c.name}</td>
-                <td style={{ ...detailTdStyle, color: 'var(--text-muted)' }}>{c.title || '\u2014'}</td>
-                <td style={detailTdStyle}>{c.email ? <a href={`mailto:${c.email}`} style={{ color: 'var(--accent)', textDecoration: 'none' }}>{c.email}</a> : '\u2014'}</td>
-                <td style={{ ...detailTdStyle, color: 'var(--text-muted)' }}>{c.phone || '\u2014'}</td>
-                <td style={detailTdStyle}>
-                  {c.is_primary
-                    ? <span style={{ fontSize: 12, fontWeight: 500, color: '#059669', backgroundColor: '#ecfdf5', padding: '2px 8px', borderRadius: 20, border: '1px solid #a7f3d0' }}>Ja</span>
-                    : <span style={{ color: 'var(--text-placeholder)', fontSize: 13 }}>Nej</span>}
-                </td>
-                <td style={{ ...detailTdStyle, textAlign: 'right' }}>
-                  <button onClick={() => onEdit(c)} style={actionBtnStyle}>Rediger</button>
-                  <button onClick={() => onDelete(c.id)} style={{ ...actionBtnStyle, color: '#ef4444', marginLeft: 10 }}>Slet</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {contacts.map((c) => (
+            <div key={c.id} style={contactCardStyle}>
+              {editingId === c.id ? (
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    <label style={contactEditLabelStyle}>Navn *<input name="name" value={editForm.name} onChange={handleEditChange} style={contactEditInputStyle} /></label>
+                    <label style={contactEditLabelStyle}>Titel<input name="title" value={editForm.title} onChange={handleEditChange} style={contactEditInputStyle} /></label>
+                    <label style={contactEditLabelStyle}>Email<input name="email" type="email" value={editForm.email} onChange={handleEditChange} style={contactEditInputStyle} /></label>
+                    <label style={contactEditLabelStyle}>Telefon<input name="phone" value={editForm.phone} onChange={handleEditChange} style={contactEditInputStyle} /></label>
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, fontSize: 13, cursor: 'pointer', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                    <input name="is_primary" type="checkbox" checked={editForm.is_primary} onChange={handleEditChange} style={{ width: 15, height: 15, accentColor: 'var(--accent)', cursor: 'pointer' }} />
+                    Primær kontakt
+                  </label>
+                  <label style={{ ...contactEditLabelStyle, marginTop: 14 }}>Noter
+                    <textarea name="notes" value={editForm.notes} onChange={handleEditChange} rows={2} style={{ ...contactEditInputStyle, resize: 'vertical' }} />
+                  </label>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
+                    <button onClick={cancelEdit} style={{ ...secondaryBtnStyle, padding: '6px 14px', fontSize: 12 }}>Annuller</button>
+                    <button onClick={() => saveEdit(c.id)} disabled={saving} style={{ ...primaryBtnSmallStyle, opacity: saving ? 0.7 : 1 }}>{saving ? 'Gemmer...' : 'Gem'}</button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{c.name}</span>
+                      {c.title && <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{c.title}</span>}
+                      {c.is_primary && (
+                        <span style={{ fontSize: 11, fontWeight: 500, color: '#059669', backgroundColor: '#ecfdf5', padding: '2px 8px', borderRadius: 20, border: '1px solid #a7f3d0' }}>Primær</span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => startEdit(c)} style={actionBtnStyle}>Rediger</button>
+                      <button onClick={() => onDelete(c.id)} style={{ ...actionBtnStyle, color: '#ef4444' }}>Slet</button>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 20, marginTop: 8 }}>
+                    {c.email && (
+                      <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                        <a href={`mailto:${c.email}`} style={{ color: 'var(--accent)', textDecoration: 'none' }}>{c.email}</a>
+                      </span>
+                    )}
+                    {c.phone && <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{c.phone}</span>}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -360,3 +406,6 @@ const primaryBtnSmallStyle = { backgroundColor: 'var(--accent)', color: '#fff', 
 const detailThStyle = { padding: '10px 14px', fontSize: 11, fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'left', borderBottom: '1px solid var(--border-subtle)' };
 const detailTdStyle = { padding: '12px 14px', fontSize: 14, color: 'var(--text-secondary)' };
 const actionBtnStyle = { background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--accent)', fontWeight: 500, padding: 0, fontFamily: 'inherit', transition: 'color 0.15s ease' };
+const contactCardStyle = { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '16px 20px', transition: 'box-shadow 0.15s ease' };
+const contactEditLabelStyle = { display: 'flex', flexDirection: 'column', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', gap: 5 };
+const contactEditInputStyle = { padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 7, fontSize: 13, outline: 'none', fontFamily: 'inherit', color: 'var(--text)', backgroundColor: 'var(--bg-input)' };
