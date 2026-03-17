@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import CompanyForm from '../components/CompanyForm';
 import ContactForm from '../components/ContactForm';
 import Skeleton from '../components/Skeleton';
-import { activityIcons, IconChat } from '../components/Icons';
+import { activityIcons, IconChat, IconPin, IconTrash, IconPaperclip } from '../components/Icons';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -500,12 +500,89 @@ function LogEntryForm({ companyId, initial, onDone, onCancel }) {
   );
 }
 
+function LogEntryModal({ entry, companyId, onClose, onRefresh }) {
+  const [editing, setEditing] = useState(false);
+  const ac = activityColors[entry.activity_type] || activityColors.other;
+  const Icon = activityIcons[entry.activity_type] || IconChat;
+  const atts = entry.attachments || [];
+
+  const isImage = (filename) => /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(filename);
+
+  return (
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={logModalStyle} onClick={(e) => e.stopPropagation()}>
+        {editing ? (
+          <LogEntryForm companyId={companyId} initial={entry} onDone={() => { setEditing(false); onRefresh(); onClose(); }} onCancel={() => setEditing(false)} />
+        ) : (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 13, fontWeight: 500, backgroundColor: ac.bg, color: ac.color, border: `1px solid ${ac.border}`, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <Icon size={14} color={ac.color} />
+                  {activityLabels[entry.activity_type] || entry.activity_type}
+                </span>
+                {entry.pinned && <IconPin size={14} color="var(--accent)" />}
+              </div>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--text-faint)', width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Dato</div>
+                <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{new Date(entry.occurred_at).toLocaleDateString('da-DK')}</div>
+              </div>
+              {entry.logged_by && (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Logget af</div>
+                  <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{entry.logged_by}</div>
+                </div>
+              )}
+            </div>
+
+            {entry.notes && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Noter</div>
+                <p style={{ margin: 0, fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{entry.notes}</p>
+              </div>
+            )}
+
+            {atts.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Vedhæftninger</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {atts.map((att, i) => (
+                    <div key={i}>
+                      {isImage(att.filename) && (
+                        <a href={att.url} target="_blank" rel="noopener noreferrer">
+                          <img src={att.url} alt={att.filename} style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8, border: '1px solid var(--border-subtle)', marginBottom: 4, display: 'block' }} />
+                        </a>
+                      )}
+                      <a href={att.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: 'var(--accent)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <IconPaperclip size={13} color="var(--accent)" />
+                        {att.filename}
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
+              <button onClick={() => setEditing(true)} style={{ ...secondaryBtnStyle, padding: '7px 16px', fontSize: 13 }}>Rediger</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function OpslagstavlenTab({ companyId, entries, onRefresh }) {
   const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [expandedAttachments, setExpandedAttachments] = useState({});
+  const [selectedEntry, setSelectedEntry] = useState(null);
 
-  const deleteEntry = async (entryId) => {
+  const deleteEntry = async (e, entryId) => {
+    e.stopPropagation();
     if (!window.confirm('Slet denne note?')) return;
     try {
       const res = await fetch(`${API_URL}/api/companies/${companyId}/log/${entryId}`, { method: 'DELETE' });
@@ -517,7 +594,8 @@ function OpslagstavlenTab({ companyId, entries, onRefresh }) {
     }
   };
 
-  const togglePin = async (entry) => {
+  const togglePin = async (e, entry) => {
+    e.stopPropagation();
     try {
       const res = await fetch(`${API_URL}/api/companies/${companyId}/log/${entry.id}`, {
         method: 'PATCH',
@@ -532,20 +610,16 @@ function OpslagstavlenTab({ companyId, entries, onRefresh }) {
     }
   };
 
-  const toggleAttachments = (id) => {
-    setExpandedAttachments((p) => ({ ...p, [id]: !p[id] }));
-  };
-
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Opslagstavlen</h3>
-        <button onClick={() => { setShowForm(!showForm); setEditingId(null); }} style={primaryBtnSmallStyle}>
+        <button onClick={() => setShowForm(!showForm)} style={primaryBtnSmallStyle}>
           {showForm ? 'Annuller' : '+ Ny note'}
         </button>
       </div>
 
-      {showForm && !editingId && (
+      {showForm && (
         <LogEntryForm companyId={companyId} onDone={() => { setShowForm(false); onRefresh(); }} onCancel={() => setShowForm(false)} />
       )}
 
@@ -557,17 +631,12 @@ function OpslagstavlenTab({ companyId, entries, onRefresh }) {
             const ac = activityColors[entry.activity_type] || activityColors.other;
             const Icon = activityIcons[entry.activity_type] || IconChat;
             const atts = entry.attachments || [];
-            const isExpanded = expandedAttachments[entry.id];
-
-            if (editingId === entry.id) {
-              return <LogEntryForm key={entry.id} companyId={companyId} initial={entry} onDone={() => { setEditingId(null); onRefresh(); }} onCancel={() => setEditingId(null)} />;
-            }
 
             return (
-              <div key={entry.id} style={logCardStyle}>
+              <div key={entry.id} onClick={() => setSelectedEntry(entry)} style={{ ...logCardStyle, cursor: 'pointer', transition: 'box-shadow 0.15s ease, border-color 0.15s ease' }} onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)'; }} onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)'; }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                    {entry.pinned && <span title="Fastgjort" style={{ fontSize: 14 }}>&#x1F4CC;</span>}
+                    {entry.pinned && <IconPin size={14} color="var(--accent)" />}
                     <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, backgroundColor: ac.bg, color: ac.color, border: `1px solid ${ac.border}`, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                       <Icon size={13} color={ac.color} />
                       {activityLabels[entry.activity_type] || entry.activity_type}
@@ -576,33 +645,30 @@ function OpslagstavlenTab({ companyId, entries, onRefresh }) {
                       {new Date(entry.occurred_at).toLocaleDateString('da-DK')}
                     </span>
                     {entry.logged_by && <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{entry.logged_by}</span>}
-                    {entry.contacts?.name && <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>{entry.contacts.name}</span>}
                     {atts.length > 0 && (
-                      <button onClick={() => toggleAttachments(entry.id)} style={{ ...logIconBtnStyle, color: 'var(--text-muted)' }} title="Se vedhæftede">
-                        &#x1F4CE; {atts.length}
-                      </button>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        <IconPaperclip size={12} color="var(--text-muted)" /> {atts.length}
+                      </span>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                    <button onClick={() => togglePin(entry)} style={{ ...logIconBtnStyle, color: entry.pinned ? 'var(--accent)' : 'var(--text-placeholder)' }} title={entry.pinned ? 'Fjern fastgørelse' : 'Fastgør'}>&#x1F4CC;</button>
-                    <button onClick={() => { setEditingId(entry.id); setShowForm(false); }} style={{ ...logIconBtnStyle, color: 'var(--text-muted)' }} title="Rediger">&#x270F;&#xFE0E;</button>
-                    <button onClick={() => deleteEntry(entry.id)} style={{ ...logIconBtnStyle, color: '#ef4444' }} title="Slet">&#x1F5D1;&#xFE0E;</button>
+                  <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                    <button onClick={(e) => togglePin(e, entry)} style={{ ...logIconBtnStyle, color: entry.pinned ? 'var(--accent)' : 'var(--text-placeholder)' }} title={entry.pinned ? 'Fjern fastgørelse' : 'Fastgør'}>
+                      <IconPin size={14} />
+                    </button>
+                    <button onClick={(e) => deleteEntry(e, entry.id)} style={{ ...logIconBtnStyle, color: '#ef4444' }} title="Slet">
+                      <IconTrash size={14} />
+                    </button>
                   </div>
                 </div>
-                {entry.notes && <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{entry.notes}</p>}
-                {isExpanded && atts.length > 0 && (
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
-                    {atts.map((att, i) => (
-                      <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none', padding: '3px 8px', backgroundColor: 'var(--bg-input)', borderRadius: 6, border: '1px solid var(--border-subtle)' }}>
-                        {att.filename}
-                      </a>
-                    ))}
-                  </div>
-                )}
+                {entry.notes && <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{entry.notes}</p>}
               </div>
             );
           })}
         </div>
+      )}
+
+      {selectedEntry && (
+        <LogEntryModal entry={selectedEntry} companyId={companyId} onClose={() => setSelectedEntry(null)} onRefresh={onRefresh} />
       )}
     </div>
   );
@@ -613,7 +679,9 @@ const secondaryBtnStyle = { backgroundColor: 'var(--bg-card)', color: 'var(--tex
 const deleteBtnStyle = { backgroundColor: 'var(--bg-card)', color: '#dc2626', border: '1px solid #fecaca', padding: '9px 18px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', transition: 'all 0.15s ease' };
 const primaryBtnSmallStyle = { backgroundColor: 'var(--accent)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', transition: 'background-color 0.15s ease' };
 const logCardStyle = { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
-const logIconBtnStyle = { background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '2px 4px', fontFamily: 'inherit', lineHeight: 1, borderRadius: 4, transition: 'opacity 0.15s ease' };
+const logIconBtnStyle = { background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px', fontFamily: 'inherit', lineHeight: 1, borderRadius: 6, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', transition: 'background-color 0.15s ease' };
+const overlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'var(--overlay-bg, rgba(0,0,0,0.4))', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
+const logModalStyle = { backgroundColor: 'var(--bg-card)', borderRadius: 12, padding: 28, width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', boxShadow: 'var(--shadow-lg, 0 8px 30px rgba(0,0,0,0.12))', border: '1px solid var(--border-card)' };
 const actionBtnStyle = { background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--accent)', fontWeight: 500, padding: 0, fontFamily: 'inherit', transition: 'color 0.15s ease' };
 const contactCardStyle = { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', transition: 'box-shadow 0.15s ease, opacity 0.15s ease' };
 const dragHandleStyle = { cursor: 'grab', color: 'var(--text-placeholder)', fontSize: 18, lineHeight: '1', display: 'flex', alignItems: 'center', userSelect: 'none', padding: '0 2px', flexShrink: 0 };
