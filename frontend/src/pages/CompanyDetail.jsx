@@ -14,8 +14,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 const tabs = [
   { key: 'info', label: 'Info' },
   { key: 'kontakter', label: 'Kontakter' },
-  { key: 'projekter', label: 'Projekter' },
-  { key: 'logbog', label: 'Logbog' },
+  { key: 'opslagstavlen', label: 'Opslagstavlen' },
 ];
 
 const statusColors = {
@@ -50,7 +49,6 @@ export default function CompanyDetail() {
   const [activeTab, setActiveTab] = useState('info');
   const [company, setCompany] = useState(null);
   const [contacts, setContacts] = useState([]);
-  const [projects, setProjects] = useState([]);
   const [logEntries, setLogEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showEditCompany, setShowEditCompany] = useState(false);
@@ -69,13 +67,14 @@ export default function CompanyDetail() {
     }
     setContacts(data || []);
   };
-  const fetchProjects = async () => {
-    const { data } = await supabase.from('projects').select('*').eq('company_id', id).order('invoice_date', { ascending: false });
-    setProjects(data || []);
-  };
   const fetchLogEntries = async () => {
-    const { data } = await supabase.from('log_entries').select('*, contacts(name)').eq('company_id', id).order('occurred_at', { ascending: false });
-    setLogEntries(data || []);
+    try {
+      const res = await fetch(`${API_URL}/api/companies/${id}/log`);
+      const json = await res.json();
+      setLogEntries(json.entries || []);
+    } catch {
+      setLogEntries([]);
+    }
   };
 
   useEffect(() => {
@@ -86,8 +85,7 @@ export default function CompanyDetail() {
   useEffect(() => {
     if (!company) return;
     if (activeTab === 'kontakter') fetchContacts();
-    else if (activeTab === 'projekter') fetchProjects();
-    else if (activeTab === 'logbog') fetchLogEntries();
+    else if (activeTab === 'opslagstavlen') fetchLogEntries();
   }, [activeTab, company]);
 
   const deleteContact = async (contactId) => {
@@ -159,8 +157,7 @@ export default function CompanyDetail() {
         {activeTab === 'kontakter' && (
           <KontakterTab contacts={contacts} company={company} onAdd={() => { setEditingContact(null); setShowContactForm(true); }} onDelete={deleteContact} onPrefill={(prefill) => { setEditingContact(prefill); setShowContactForm(true); }} onRefresh={fetchContacts} />
         )}
-        {activeTab === 'projekter' && <ProjekterTab projects={projects} />}
-        {activeTab === 'logbog' && <LogbogTab entries={logEntries} />}
+        {activeTab === 'opslagstavlen' && <OpslagstavlenTab companyId={id} entries={logEntries} onRefresh={fetchLogEntries} />}
       </div>
 
       {showEditCompany && <CompanyForm company={company} onClose={() => setShowEditCompany(false)} onSaved={() => { setShowEditCompany(false); fetchCompany(); }} />}
@@ -405,60 +402,140 @@ function KontakterTab({ contacts, company, onAdd, onDelete, onPrefill, onRefresh
   );
 }
 
-function ProjekterTab({ projects }) {
-  return (
-    <div>
-      <h3 style={{ margin: '0 0 18px', fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Projekter</h3>
-      {projects.length === 0 ? (
-        <p style={{ color: 'var(--text-faint)', fontSize: 14 }}>Ingen projekter endnu.</p>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr><th style={detailThStyle}>Projekt</th><th style={detailThStyle}>Beløb</th><th style={detailThStyle}>Fakturadato</th><th style={detailThStyle}>Beskrivelse</th></tr>
-          </thead>
-          <tbody>
-            {projects.map((p) => (
-              <tr key={p.id} style={{ borderBottom: '1px solid var(--border-subtle)', transition: 'background-color 0.1s ease' }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}
-              >
-                <td style={{ ...detailTdStyle, fontWeight: 600, color: 'var(--text)' }}>{p.name || '\u2014'}</td>
-                <td style={{ ...detailTdStyle, fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)', fontWeight: 500 }}>{p.amount_dkk ? Number(p.amount_dkk).toLocaleString('da-DK') + ' kr.' : '\u2014'}</td>
-                <td style={{ ...detailTdStyle, color: 'var(--text-muted)' }}>{p.invoice_date ? new Date(p.invoice_date).toLocaleDateString('da-DK') : '\u2014'}</td>
-                <td style={{ ...detailTdStyle, color: 'var(--text-muted)' }}>{p.description || '\u2014'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
-  );
-}
+const activityTypeOptions = [
+  { value: 'met', label: 'Møde' },
+  { value: 'called', label: 'Opkald' },
+  { value: 'emailed', label: 'Email' },
+  { value: 'no_answer', label: 'Intet svar' },
+  { value: 'proposal_sent', label: 'Tilbud sendt' },
+  { value: 'contract_signed', label: 'Kontrakt underskrevet' },
+  { value: 'other', label: 'Andet' },
+];
 
-function LogbogTab({ entries }) {
+function OpslagstavlenTab({ companyId, entries, onRefresh }) {
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ activity_type: 'other', notes: '', occurred_at: new Date().toISOString().slice(0, 10) });
+  const [files, setFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
+
+  const resetForm = () => {
+    setForm({ activity_type: 'other', notes: '', occurred_at: new Date().toISOString().slice(0, 10) });
+    setFiles([]);
+    setShowForm(false);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+
+    // Upload files to Supabase Storage
+    let attachments = [];
+    if (files.length > 0) {
+      setUploading(true);
+      for (const file of files) {
+        const path = `${companyId}/${Date.now()}-${file.name}`;
+        const { error } = await supabase.storage.from('attachments').upload(path, file);
+        if (!error) {
+          const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(path);
+          attachments.push({ url: urlData.publicUrl, filename: file.name });
+        }
+      }
+      setUploading(false);
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/companies/${companyId}/log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          activity_type: form.activity_type,
+          notes: form.notes.trim() || null,
+          occurred_at: form.occurred_at,
+          attachments,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Ukendt fejl');
+      resetForm();
+      onRefresh();
+    } catch (err) {
+      alert(`Fejl: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div>
-      <h3 style={{ margin: '0 0 18px', fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Aktivitetslog</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Opslagstavlen</h3>
+        <button onClick={() => setShowForm(!showForm)} style={primaryBtnSmallStyle}>
+          {showForm ? 'Annuller' : '+ Ny note'}
+        </button>
+      </div>
+
+      {showForm && (
+        <form onSubmit={handleSubmit} style={{ ...logCardStyle, marginBottom: 18 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <label style={contactEditLabelStyle}>
+              Type
+              <select name="activity_type" value={form.activity_type} onChange={(e) => setForm((p) => ({ ...p, activity_type: e.target.value }))} style={contactEditInputStyle}>
+                {activityTypeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </label>
+            <label style={contactEditLabelStyle}>
+              Dato
+              <input type="date" value={form.occurred_at} onChange={(e) => setForm((p) => ({ ...p, occurred_at: e.target.value }))} style={contactEditInputStyle} />
+            </label>
+          </div>
+          <label style={{ ...contactEditLabelStyle, marginTop: 14 }}>
+            Noter
+            <textarea value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} rows={3} style={{ ...contactEditInputStyle, resize: 'vertical' }} />
+          </label>
+          <label style={{ ...contactEditLabelStyle, marginTop: 14 }}>
+            Vedhæftninger
+            <input type="file" multiple onChange={(e) => setFiles(Array.from(e.target.files))} style={{ fontSize: 13, color: 'var(--text-secondary)' }} />
+          </label>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+            <button type="submit" disabled={saving || uploading} style={{ ...primaryBtnSmallStyle, opacity: (saving || uploading) ? 0.7 : 1 }}>
+              {uploading ? 'Uploader...' : saving ? 'Gemmer...' : 'Opret'}
+            </button>
+          </div>
+        </form>
+      )}
+
       {entries.length === 0 ? (
-        <p style={{ color: 'var(--text-faint)', fontSize: 14 }}>Ingen logindlæg endnu.</p>
+        <p style={{ color: 'var(--text-faint)', fontSize: 14 }}>Ingen noter endnu.</p>
       ) : (
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {entries.map((entry) => {
             const ac = activityColors[entry.activity_type] || activityColors.other;
             const Icon = activityIcons[entry.activity_type] || IconChat;
+            const attachments = entry.attachments || [];
             return (
-              <div key={entry.id} style={{ padding: '14px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 5 }}>
+              <div key={entry.id} style={logCardStyle}>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 6 }}>
                   <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, backgroundColor: ac.bg, color: ac.color, border: `1px solid ${ac.border}`, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                     <Icon size={13} color={ac.color} />
                     {activityLabels[entry.activity_type] || entry.activity_type}
                   </span>
                   <span style={{ fontSize: 13, color: 'var(--text-faint)' }}>
-                    {new Date(entry.occurred_at).toLocaleDateString('da-DK')} \u2014 {entry.logged_by}
+                    {new Date(entry.occurred_at).toLocaleDateString('da-DK')}
                   </span>
-                  {entry.contacts?.name && <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>\u2192 {entry.contacts.name}</span>}
+                  {entry.logged_by && <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{entry.logged_by}</span>}
+                  {entry.contacts?.name && <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>{entry.contacts.name}</span>}
                 </div>
-                {entry.notes && <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{entry.notes}</p>}
+                {entry.notes && <p style={{ margin: '0 0 4px', fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{entry.notes}</p>}
+                {attachments.length > 0 && (
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
+                    {attachments.map((att, i) => (
+                      <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none', padding: '3px 8px', backgroundColor: 'var(--bg-input)', borderRadius: 6, border: '1px solid var(--border-subtle)' }}>
+                        {att.filename}
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -472,8 +549,7 @@ const cardStyle = { backgroundColor: 'var(--bg-card)', borderRadius: 12, padding
 const secondaryBtnStyle = { backgroundColor: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)', padding: '9px 18px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', transition: 'all 0.15s ease' };
 const deleteBtnStyle = { backgroundColor: 'var(--bg-card)', color: '#dc2626', border: '1px solid #fecaca', padding: '9px 18px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', transition: 'all 0.15s ease' };
 const primaryBtnSmallStyle = { backgroundColor: 'var(--accent)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', transition: 'background-color 0.15s ease' };
-const detailThStyle = { padding: '10px 14px', fontSize: 11, fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'left', borderBottom: '1px solid var(--border-subtle)' };
-const detailTdStyle = { padding: '12px 14px', fontSize: 14, color: 'var(--text-secondary)' };
+const logCardStyle = { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
 const actionBtnStyle = { background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--accent)', fontWeight: 500, padding: 0, fontFamily: 'inherit', transition: 'color 0.15s ease' };
 const contactCardStyle = { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', transition: 'box-shadow 0.15s ease, opacity 0.15s ease' };
 const dragHandleStyle = { cursor: 'grab', color: 'var(--text-placeholder)', fontSize: 18, lineHeight: '1', display: 'flex', alignItems: 'center', userSelect: 'none', padding: '0 2px', flexShrink: 0 };
