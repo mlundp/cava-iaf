@@ -148,28 +148,45 @@ router.get('/sync', async (_req, res) => {
         continue;
       }
 
-      const row = {
-        dinero_contact_id: contactGuid,
-        name,
-        type: 'canvas',
-        status: 'cold',
-      };
-
-      const { data: upserted, error } = await db
+      // Check if company already exists
+      const { data: existing } = await db
         .from('companies')
-        .upsert(row, { onConflict: 'dinero_contact_id' })
         .select('id')
-        .single();
+        .eq('dinero_contact_id', contactGuid)
+        .maybeSingle();
 
-      if (error) {
-        console.error('[Sync] Upsert error:', error.message, error.details);
-        continue;
+      let companyId;
+      if (existing) {
+        // Only update name — preserve manually set type, status, etc.
+        const { error } = await db
+          .from('companies')
+          .update({ name })
+          .eq('id', existing.id);
+
+        if (error) {
+          console.error('[Sync] Update error:', error.message, error.details);
+          continue;
+        }
+        console.log('[Sync] Updated existing company:', name);
+        companyId = existing.id;
       } else {
-        console.log('[Sync] Upserted row:', row.name);
+        // Insert new company with defaults
+        const { data: inserted, error } = await db
+          .from('companies')
+          .insert({ dinero_contact_id: contactGuid, name, type: 'canvas', status: 'cold' })
+          .select('id')
+          .single();
+
+        if (error) {
+          console.error('[Sync] Insert error:', error.message, error.details);
+          continue;
+        }
+        console.log('[Sync] Inserted new company:', name);
+        companyId = inserted?.id;
       }
 
-      if (upserted?.id) {
-        contactIdMap[contactGuid] = upserted.id;
+      if (companyId) {
+        contactIdMap[contactGuid] = companyId;
         companiesUpserted++;
       }
     }
