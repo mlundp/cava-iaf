@@ -36,20 +36,85 @@ router.post('/tasks', async (_req, res) => {
     const [companiesRes, contactsRes, logsRes] = await Promise.all([
       db.from('companies').select('*').order('name'),
       db.from('contacts').select('*').order('name'),
-      db.from('log_entries').select('*, companies(name), contacts(name)').order('occurred_at', { ascending: false }).limit(200),
+      db.from('log_entries').select('*, companies(name), contacts(name)').order('occurred_at', { ascending: false }),
     ]);
 
-    const companies = companiesRes.data || [];
+    const allCompanies = companiesRes.data || [];
     const contacts = contactsRes.data || [];
     const logs = logsRes.data || [];
 
-    if (companies.length === 0) {
+    if (allCompanies.length === 0) {
       return res.status(400).json({ error: 'Ingen virksomheder i CRM — kan ikke generere opgaver.' });
     }
 
-    // Build context for Claude
-    const companySummaries = companies.map((c) => {
-      const companyContacts = contacts.filter((ct) => ct.company_id === c.id);
+    // Delete existing pending tasks before generating new ones
+    await db.from('tasks').delete().eq('status', 'pending');
+
+    // Build latest activity map: company_id -> most recent occurred_at
+    const latestActivityMap = {};
+    for (const log of logs) {
+      if (!latestActivityMap[log.company_id]) {
+        latestActivityMap[log.company_id] = log.occurred_at;
+      }
+    }
+
+    const now = Date.now();
+    const DAY_MS = 86400000;
+
+    // Filter and score companies
+    const scored = allCompanies
+      .map((c) => {
+        const lastActivity = latestActivityMap[c.id];
+        const daysSinceActivity = lastActivity
+          ? (now - new Date(lastActivity).getTime()) / DAY_MS
+          : Infinity;
+
+        // Exclude companies with activity in the last 14 days
+        if (daysSinceActivity < 14) return null;
+
+        // Score by priority
+        let score = 0;
+        const isClient = c.type === 'client';
+        const hasBeenInvoiced = Number(c.total_invoiced_dkk) > 0;
+
+        if (isClient && daysSinceActivity === Infinity) {
+          score = 100; // Client + no activity ever
+        } else if (isClient && daysSinceActivity > 60) {
+          score = 90; // Client + last activity > 60 days
+        } else if (isClient && daysSinceActivity >= 14) {
+          score = 70; // Client + last activity 14-60 days
+        } else if (!isClient && hasBeenInvoiced) {
+          score = 70; // Canvas + has been invoiced before
+        } else if (!isClient && daysSinceActivity === Infinity) {
+          score = 50; // Canvas + no activity ever
+        } else {
+          score = 30; // Everything else that passed the 14-day filter
+        }
+
+        // Boost hot/warm status
+        if (c.status === 'hot') score += 10;
+        else if (c.status === 'warm') score += 5;
+
+        return { company: c, score, daysSinceActivity };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.score - a.score || a.daysSinceActivity - b.daysSinceActivity);
+
+    // Take top 15
+    const selectedCompanies = scored.slice(0, 15).map((s) => s.company);
+
+    console.log('[AI] Companies selected for task generation:', selectedCompanies.map(c => c.name));
+
+    if (selectedCompanies.length === 0) {
+      return res.status(400).json({ error: 'Alle virksomheder har aktivitet inden for de sidste 14 dage — ingen opgaver nødvendige.' });
+    }
+
+    // Build context for Claude — only selected companies
+    const selectedIds = new Set(selectedCompanies.map((c) => c.id));
+    const relevantContacts = contacts.filter((ct) => selectedIds.has(ct.company_id));
+
+    const companySummaries = selectedCompanies.map((c) => {
+      const companyContacts = relevantContacts.filter((ct) => ct.company_id === c.id);
       const companyLogs = logs.filter((l) => l.company_id === c.id).slice(0, 5);
 
       let summary = `- ${c.name} (type: ${c.type}, status: ${c.status})`;
@@ -76,21 +141,14 @@ router.post('/tasks', async (_req, res) => {
         summary += `\n  Ingen aktivitet logget endnu`;
       }
 
-      return { id: c.id, summary };
-    });
-
-    const companyIds = companies.map((c) => c.id);
-    const contactsByCompany = {};
-    contacts.forEach((ct) => {
-      if (!contactsByCompany[ct.company_id]) contactsByCompany[ct.company_id] = [];
-      contactsByCompany[ct.company_id].push(ct);
+      return summary;
     });
 
     const prompt = `Du er Medhjælperen — en intelligent CRM-assistent for et dansk bureau.
 
-Herunder er en oversigt over alle virksomheder, kontaktpersoner og seneste aktivitet i CRM-systemet:
+Herunder er en oversigt over udvalgte virksomheder, kontaktpersoner og seneste aktivitet i CRM-systemet:
 
-${companySummaries.map((s) => s.summary).join('\n\n')}
+${companySummaries.join('\n\n')}
 
 Baseret på denne data, generer en prioriteret liste med 5-10 konkrete outreach-opgaver.
 Prioriter virksomheder der:
@@ -98,6 +156,8 @@ Prioriter virksomheder der:
 - Er klienter med faldende aktivitet
 - Er canvas/leads med potentiale der ikke er fulgt op på
 - Har kontaktpersoner man kan henvende sig til
+
+Du må ikke foreslå at kontakte en virksomhed hvis der allerede er logget aktivitet inden for de sidste 14 dage.
 
 For hver opgave, returner et JSON array med objekter der har disse felter:
 - company_id (UUID af virksomheden)
@@ -108,15 +168,15 @@ For hver opgave, returner et JSON array med objekter der har disse felter:
 - reasoning (kort begrundelse for hvorfor denne opgave er vigtig)
 
 Her er virksomheds-ID'er til reference:
-${companies.map((c) => `${c.name}: ${c.id}`).join('\n')}
+${selectedCompanies.map((c) => `${c.name}: ${c.id}`).join('\n')}
 
-${contacts.length > 0 ? `\nKontaktperson-ID'er:\n${contacts.map((ct) => `${ct.name} (${companies.find((c) => c.id === ct.company_id)?.name || 'ukendt'}): ${ct.id}`).join('\n')}` : ''}
+${relevantContacts.length > 0 ? `\nKontaktperson-ID'er:\n${relevantContacts.map((ct) => `${ct.name} (${selectedCompanies.find((c) => c.id === ct.company_id)?.name || 'ukendt'}): ${ct.id}`).join('\n')}` : ''}
 
 VIGTIGT: Returner KUN et JSON array — ingen anden tekst.`;
 
     const message = await claude.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
+      max_tokens: 8000,
       messages: [{ role: 'user', content: prompt }],
     });
 
@@ -146,8 +206,9 @@ VIGTIGT: Returner KUN et JSON array — ingen anden tekst.`;
     }
 
     // Validate and insert tasks
+    const selectedIdsList = selectedCompanies.map((c) => c.id);
     const validTasks = tasks
-      .filter((t) => t.title && companyIds.includes(t.company_id))
+      .filter((t) => t.title && selectedIdsList.includes(t.company_id))
       .map((t) => ({
         company_id: t.company_id,
         contact_id: t.contact_id || null,
