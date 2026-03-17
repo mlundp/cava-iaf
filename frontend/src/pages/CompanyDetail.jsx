@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import CompanyForm from '../components/CompanyForm';
 import ContactForm from '../components/ContactForm';
@@ -46,7 +46,10 @@ const activityColors = {
 export default function CompanyDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('info');
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const entryParam = searchParams.get('entry');
+  const [activeTab, setActiveTab] = useState(tabs.some((t) => t.key === tabParam) ? tabParam : 'info');
   const [company, setCompany] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [logEntries, setLogEntries] = useState([]);
@@ -157,7 +160,7 @@ export default function CompanyDetail() {
         {activeTab === 'kontakter' && (
           <KontakterTab contacts={contacts} company={company} onAdd={() => { setEditingContact(null); setShowContactForm(true); }} onDelete={deleteContact} onPrefill={(prefill) => { setEditingContact(prefill); setShowContactForm(true); }} onRefresh={fetchContacts} />
         )}
-        {activeTab === 'opslagstavlen' && <OpslagstavlenTab companyId={id} entries={logEntries} onRefresh={fetchLogEntries} />}
+        {activeTab === 'opslagstavlen' && <OpslagstavlenTab companyId={id} entries={logEntries} onRefresh={fetchLogEntries} highlightEntryId={entryParam} />}
       </div>
 
       {showEditCompany && <CompanyForm company={company} onClose={() => setShowEditCompany(false)} onSaved={() => { setShowEditCompany(false); fetchCompany(); }} />}
@@ -586,9 +589,27 @@ function LogEntryModal({ entry, companyId, onClose, onRefresh }) {
   );
 }
 
-function OpslagstavlenTab({ companyId, entries, onRefresh }) {
+function OpslagstavlenTab({ companyId, entries, onRefresh, highlightEntryId }) {
   const [showForm, setShowForm] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState(null);
+  const [highlightedId, setHighlightedId] = useState(highlightEntryId || null);
+
+  // Auto-open modal for the highlighted entry once entries load
+  useEffect(() => {
+    if (highlightEntryId && entries.length > 0 && !selectedEntry) {
+      const target = entries.find((e) => e.id === highlightEntryId);
+      if (target) {
+        setSelectedEntry(target);
+        // Scroll to the entry card
+        setTimeout(() => {
+          const el = document.getElementById(`log-entry-${highlightEntryId}`);
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+        // Fade out highlight after 2 seconds
+        setTimeout(() => setHighlightedId(null), 2000);
+      }
+    }
+  }, [highlightEntryId, entries]);
 
   const deleteEntry = async (e, entryId) => {
     e.stopPropagation();
@@ -642,7 +663,7 @@ function OpslagstavlenTab({ companyId, entries, onRefresh }) {
             const atts = entry.attachments || [];
 
             return (
-              <div key={entry.id} onClick={() => setSelectedEntry(entry)} style={{ ...logCardStyle, cursor: 'pointer', transition: 'box-shadow 0.15s ease, border-color 0.15s ease' }} onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)'; }} onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)'; }}>
+              <div key={entry.id} id={`log-entry-${entry.id}`} onClick={() => setSelectedEntry(entry)} style={{ ...logCardStyle, cursor: 'pointer', transition: 'box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.5s ease', ...(highlightedId === entry.id ? { borderColor: 'var(--accent)', boxShadow: '0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent)' } : {}) }} onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)'; }} onMouseLeave={(e) => { e.currentTarget.style.boxShadow = highlightedId === entry.id ? '0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent)' : '0 1px 3px rgba(0,0,0,0.06)'; }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                     {entry.pinned && <IconPin size={14} color="var(--accent)" />}
