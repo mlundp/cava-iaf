@@ -150,7 +150,7 @@ export default function CompanyDetail() {
       <div style={cardStyle}>
         {activeTab === 'info' && <InfoTab company={company} onCompanyUpdated={fetchCompany} />}
         {activeTab === 'kontakter' && (
-          <KontakterTab contacts={contacts} onAdd={() => { setEditingContact(null); setShowContactForm(true); }} onEdit={(c) => { setEditingContact(c); setShowContactForm(true); }} onDelete={deleteContact} />
+          <KontakterTab contacts={contacts} company={company} onAdd={() => { setEditingContact(null); setShowContactForm(true); }} onEdit={(c) => { setEditingContact(c); setShowContactForm(true); }} onDelete={deleteContact} onPrefill={(prefill) => { setEditingContact(prefill); setShowContactForm(true); }} />
         )}
         {activeTab === 'projekter' && <ProjekterTab projects={projects} />}
         {activeTab === 'logbog' && <LogbogTab entries={logEntries} />}
@@ -222,12 +222,35 @@ function InfoTab({ company, onCompanyUpdated }) {
   );
 }
 
-function KontakterTab({ contacts, onAdd, onEdit, onDelete }) {
+function KontakterTab({ contacts, company, onAdd, onEdit, onDelete, onPrefill }) {
+  const [fetchingDinero, setFetchingDinero] = useState(false);
+
+  const fetchFromDinero = async () => {
+    setFetchingDinero(true);
+    try {
+      const res = await fetch(`${API_URL}/api/dinero/contacts/${company.dinero_contact_id}`);
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Ukendt fejl');
+      onPrefill({ name: data.Name || '', email: data.Email || '', phone: data.Phone || '', _prefill: true });
+    } catch (err) {
+      alert(`Kunne ikke hente kontakt: ${err.message}`);
+    } finally {
+      setFetchingDinero(false);
+    }
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Kontaktpersoner</h3>
-        <button onClick={onAdd} style={primaryBtnSmallStyle}>+ Tilføj kontakt</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {company?.dinero_contact_id && (
+            <button onClick={fetchFromDinero} disabled={fetchingDinero} style={{ ...secondaryBtnStyle, opacity: fetchingDinero ? 0.6 : 1, padding: '7px 14px', fontSize: 13 }}>
+              {fetchingDinero ? 'Henter...' : 'Hent fra Dinero'}
+            </button>
+          )}
+          <button onClick={onAdd} style={primaryBtnSmallStyle}>+ Tilføj kontakt</button>
+        </div>
       </div>
       {contacts.length === 0 ? (
         <p style={{ color: 'var(--text-faint)', fontSize: 14 }}>Ingen kontaktpersoner endnu.</p>

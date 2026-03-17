@@ -4,9 +4,9 @@ import { supabase } from '../lib/supabase';
 const initialState = { name: '', title: '', email: '', phone: '', is_primary: false, notes: '' };
 
 export default function ContactForm({ companyId, contact, onClose, onSaved }) {
-  const isEdit = !!contact;
+  const isEdit = !!contact && !contact._prefill;
   const [form, setForm] = useState(
-    isEdit ? { name: contact.name || '', title: contact.title || '', email: contact.email || '', phone: contact.phone || '', is_primary: contact.is_primary || false, notes: contact.notes || '' } : initialState
+    contact ? { name: contact.name || '', title: contact.title || '', email: contact.email || '', phone: contact.phone || '', is_primary: contact.is_primary || false, notes: contact.notes || '' } : initialState
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
