@@ -62,7 +62,11 @@ export default function CompanyDetail() {
     setCompany(data);
   };
   const fetchContacts = async () => {
-    const { data } = await supabase.from('contacts').select('*').eq('company_id', id).order('is_primary', { ascending: false }).order('sort_order', { ascending: true });
+    let { data } = await supabase.from('contacts').select('*').eq('company_id', id).order('is_primary', { ascending: false }).order('sort_order', { ascending: true });
+    if (!data) {
+      // Fallback if sort_order column doesn't exist yet (migration not applied)
+      ({ data } = await supabase.from('contacts').select('*').eq('company_id', id).order('is_primary', { ascending: false }));
+    }
     setContacts(data || []);
   };
   const fetchProjects = async () => {
@@ -470,7 +474,7 @@ const primaryBtnSmallStyle = { backgroundColor: 'var(--accent)', color: '#fff', 
 const detailThStyle = { padding: '10px 14px', fontSize: 11, fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'left', borderBottom: '1px solid var(--border-subtle)' };
 const detailTdStyle = { padding: '12px 14px', fontSize: 14, color: 'var(--text-secondary)' };
 const actionBtnStyle = { background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--accent)', fontWeight: 500, padding: 0, fontFamily: 'inherit', transition: 'color 0.15s ease' };
-const contactCardStyle = { backgroundColor: 'var(--bg-surface, #fafafa)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 20px', transition: 'box-shadow 0.15s ease, opacity 0.15s ease' };
+const contactCardStyle = { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', transition: 'box-shadow 0.15s ease, opacity 0.15s ease' };
 const dragHandleStyle = { cursor: 'grab', color: 'var(--text-placeholder)', fontSize: 18, lineHeight: '1', display: 'flex', alignItems: 'center', userSelect: 'none', padding: '0 2px', flexShrink: 0 };
 const contactEditLabelStyle = { display: 'flex', flexDirection: 'column', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', gap: 5 };
 const contactEditInputStyle = { padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 7, fontSize: 13, outline: 'none', fontFamily: 'inherit', color: 'var(--text)', backgroundColor: 'var(--bg-input)' };

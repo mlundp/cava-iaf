@@ -41,7 +41,7 @@ export default function ContactForm({ companyId, contact, onClose, onSaved }) {
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
             {isEdit ? 'Rediger kontakt' : 'Tilføj kontakt'}
           </h2>
-          <button onClick={onClose} style={closeBtnStyle}>\u00d7</button>
+          <button onClick={onClose} style={closeBtnStyle}>×</button>
         </div>
 
         {error && <p style={errorStyle}>{error}</p>}
