@@ -36,6 +36,17 @@ async function getDineroAuthHeader() {
   return `Bearer ${cachedToken}`;
 }
 
+// Allowed columns that exist in the projects table
+const ALLOWED_FIELDS = ['name', 'description', 'status', 'start_date', 'deadline', 'amount_dkk', 'cost_dkk', 'dinero_invoice_number', 'dinero_invoice_guid', 'invoice_date', 'booking_year', 'invoiced', 'cost_paid', 'client_paid'];
+
+function pickFields(body) {
+  const result = {};
+  for (const key of ALLOWED_FIELDS) {
+    if (key in body) result[key] = body[key];
+  }
+  return result;
+}
+
 // GET /api/projects - all projects with company name
 router.get('/', async (_req, res) => {
   try {
@@ -97,7 +108,7 @@ router.post('/company/:companyId', async (req, res) => {
 
     const { data, error } = await db
       .from('projects')
-      .insert({ ...req.body, company_id: companyId, project_number })
+      .insert({ ...pickFields(req.body), company_id: companyId, project_number })
       .select('*')
       .single();
     if (error) throw error;
@@ -114,7 +125,7 @@ router.patch('/:id', async (req, res) => {
     const db = getSupabase();
     const { data, error } = await db
       .from('projects')
-      .update(req.body)
+      .update(pickFields(req.body))
       .eq('id', req.params.id)
       .select('*')
       .single();
