@@ -758,24 +758,8 @@ function ProjekterTab({ companyId, projects, onRefresh }) {
     }
   };
 
-  const saveEdit = async (projectId, form) => {
-    try {
-      const res = await fetch(`${API_URL}/api/projects/${projectId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || 'Ukendt fejl');
-      setEditingProject(null);
-      onRefresh();
-    } catch (err) {
-      alert(`Fejl: ${err.message}`);
-    }
-  };
-
   const formatDate = (d) => !d ? '\u2014' : new Date(d).toLocaleDateString('da-DK');
-  const formatAmount = (a) => !a ? '\u2014' : Number(a).toLocaleString('da-DK') + ' kr.';
+  const formatAmount = (a) => a == null || a === '' ? '\u2014' : Number(a).toLocaleString('da-DK') + ' kr.';
 
   return (
     <div>
@@ -795,6 +779,9 @@ function ProjekterTab({ companyId, projects, onRefresh }) {
           {projects.map((p) => {
             const ss = projectStatusStyles[p.status] || projectStatusStyles.planlagt;
             const sr = syncResult[p.id];
+            const brutto = (Number(p.amount_dkk) || 0) - (Number(p.cost_dkk) || 0);
+            const sale = Number(p.amount_dkk) || 0;
+            const daekning = sale > 0 ? Math.round(brutto / sale * 100) : null;
 
             if (editingProject === p.id) {
               return <ProjectInlineForm key={p.id} companyId={companyId} initial={p} onDone={() => { setEditingProject(null); onRefresh(); }} onCancel={() => setEditingProject(null)} />;
@@ -811,11 +798,23 @@ function ProjekterTab({ companyId, projects, onRefresh }) {
                         {projectStatusLabels[p.status] || p.status}
                       </span>
                     </div>
-                    <div style={{ display: 'flex', gap: 20, fontSize: 13, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
                       {p.start_date && <span>Start: {formatDate(p.start_date)}</span>}
                       {p.deadline && <span>Deadline: {formatDate(p.deadline)}</span>}
-                      {p.amount_dkk && <span>Beløb: {formatAmount(p.amount_dkk)}</span>}
+                      {p.booking_year && <span>Bogføring: {p.booking_year}</span>}
+                      {p.invoice_date && <span>Faktura sendt: {formatDate(p.invoice_date)}</span>}
                       {p.dinero_invoice_number && <span>Faktura: {p.dinero_invoice_number}</span>}
+                    </div>
+                    <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--text-muted)', flexWrap: 'wrap', marginTop: 4 }}>
+                      {p.amount_dkk != null && <span>Salg: {formatAmount(p.amount_dkk)}</span>}
+                      {p.cost_dkk != null && <span>Omk.: {formatAmount(p.cost_dkk)}</span>}
+                      <span>Bruttofort.: {formatAmount(brutto)}</span>
+                      <span>Dækningsgrad: {daekning != null ? `${daekning}%` : '\u2014'}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-faint)', marginTop: 4 }}>
+                      <span>Faktureret: <strong style={{ color: p.invoiced ? '#059669' : 'var(--text-muted)' }}>{p.invoiced ? 'Ja' : 'Nej'}</strong></span>
+                      <span>Omk. betalt: <strong style={{ color: p.cost_paid ? '#059669' : 'var(--text-muted)' }}>{p.cost_paid ? 'Ja' : 'Nej'}</strong></span>
+                      <span>Kunde betalt: <strong style={{ color: p.client_paid ? '#059669' : 'var(--text-muted)' }}>{p.client_paid ? 'Ja' : 'Nej'}</strong></span>
                     </div>
                     {sr && (
                       <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-muted)' }}>
@@ -851,14 +850,20 @@ function ProjectInlineForm({ companyId, initial, onDone, onCancel }) {
     start_date: initial?.start_date || '',
     deadline: initial?.deadline || '',
     amount_dkk: initial?.amount_dkk || '',
+    cost_dkk: initial?.cost_dkk || '',
     dinero_invoice_number: initial?.dinero_invoice_number || '',
     dinero_invoice_guid: initial?.dinero_invoice_guid || '',
+    invoice_date: initial?.invoice_date || '',
+    booking_year: initial?.booking_year || '',
+    invoiced: initial?.invoiced || false,
+    cost_paid: initial?.cost_paid || false,
+    client_paid: initial?.client_paid || false,
   });
   const [saving, setSaving] = useState(false);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((p) => ({ ...p, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setForm((p) => ({ ...p, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleSubmit = async (e) => {
@@ -872,8 +877,14 @@ function ProjectInlineForm({ companyId, initial, onDone, onCancel }) {
       start_date: form.start_date || null,
       deadline: form.deadline || null,
       amount_dkk: form.amount_dkk ? Number(form.amount_dkk) : null,
+      cost_dkk: form.cost_dkk ? Number(form.cost_dkk) : null,
       dinero_invoice_number: form.dinero_invoice_number.trim() || null,
       dinero_invoice_guid: form.dinero_invoice_guid.trim() || null,
+      invoice_date: form.invoice_date || null,
+      booking_year: form.booking_year ? Number(form.booking_year) : null,
+      invoiced: form.invoiced,
+      cost_paid: form.cost_paid,
+      client_paid: form.client_paid,
     };
     try {
       let res;
@@ -895,7 +906,7 @@ function ProjectInlineForm({ companyId, initial, onDone, onCancel }) {
   return (
     <form onSubmit={handleSubmit} style={{ ...projectCardStyle, marginBottom: 4 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        <label style={contactEditLabelStyle}>Navn *<input name="name" value={form.name} onChange={handleChange} style={contactEditInputStyle} required /></label>
+        <label style={contactEditLabelStyle}>Beskrivelse (navn) *<input name="name" value={form.name} onChange={handleChange} style={contactEditInputStyle} required /></label>
         <label style={contactEditLabelStyle}>Status
           <select name="status" value={form.status} onChange={handleChange} style={contactEditInputStyle}>
             <option value="planlagt">Planlagt</option>
@@ -906,11 +917,28 @@ function ProjectInlineForm({ companyId, initial, onDone, onCancel }) {
         </label>
         <label style={contactEditLabelStyle}>Startdato<input name="start_date" type="date" value={form.start_date} onChange={handleChange} style={contactEditInputStyle} /></label>
         <label style={contactEditLabelStyle}>Deadline<input name="deadline" type="date" value={form.deadline} onChange={handleChange} style={contactEditInputStyle} /></label>
-        <label style={contactEditLabelStyle}>Beløb (DKK)<input name="amount_dkk" type="number" value={form.amount_dkk} onChange={handleChange} style={contactEditInputStyle} /></label>
+        <label style={contactEditLabelStyle}>Salg ex moms (DKK)<input name="amount_dkk" type="number" value={form.amount_dkk} onChange={handleChange} style={contactEditInputStyle} /></label>
+        <label style={contactEditLabelStyle}>Omkostninger ex moms (DKK)<input name="cost_dkk" type="number" value={form.cost_dkk} onChange={handleChange} style={contactEditInputStyle} /></label>
+        <label style={contactEditLabelStyle}>Faktura sendt<input name="invoice_date" type="date" value={form.invoice_date} onChange={handleChange} style={contactEditInputStyle} /></label>
+        <label style={contactEditLabelStyle}>Bogføring år<input name="booking_year" type="number" min="2000" max="2099" value={form.booking_year} onChange={handleChange} style={contactEditInputStyle} placeholder="2026" /></label>
         <label style={contactEditLabelStyle}>Dinero faktura nr.<input name="dinero_invoice_number" value={form.dinero_invoice_number} onChange={handleChange} style={contactEditInputStyle} /></label>
+        <label style={contactEditLabelStyle}>Dinero faktura GUID<input name="dinero_invoice_guid" value={form.dinero_invoice_guid} onChange={handleChange} style={contactEditInputStyle} /></label>
       </div>
-      <label style={{ ...contactEditLabelStyle, marginTop: 14 }}>Dinero faktura GUID<input name="dinero_invoice_guid" value={form.dinero_invoice_guid} onChange={handleChange} style={contactEditInputStyle} /></label>
-      <label style={{ ...contactEditLabelStyle, marginTop: 14 }}>Beskrivelse
+      <div style={{ display: 'flex', gap: 24, marginTop: 14 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+          <input name="invoiced" type="checkbox" checked={form.invoiced} onChange={handleChange} style={{ width: 15, height: 15, accentColor: 'var(--accent)', cursor: 'pointer' }} />
+          Faktureret
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+          <input name="cost_paid" type="checkbox" checked={form.cost_paid} onChange={handleChange} style={{ width: 15, height: 15, accentColor: 'var(--accent)', cursor: 'pointer' }} />
+          Omkostning betalt
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+          <input name="client_paid" type="checkbox" checked={form.client_paid} onChange={handleChange} style={{ width: 15, height: 15, accentColor: 'var(--accent)', cursor: 'pointer' }} />
+          Kunde betalt
+        </label>
+      </div>
+      <label style={{ ...contactEditLabelStyle, marginTop: 14 }}>Beskrivelse (noter)
         <textarea name="description" value={form.description} onChange={handleChange} rows={2} style={{ ...contactEditInputStyle, resize: 'vertical' }} />
       </label>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
