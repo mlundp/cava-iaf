@@ -109,7 +109,7 @@ export default function CompanyForm({ company, onClose, onSaved }) {
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
             {isEdit ? 'Rediger virksomhed' : 'Tilføj virksomhed'}
           </h2>
-          <button onClick={onClose} style={closeBtnStyle}>\u00d7</button>
+          <button onClick={onClose} style={closeBtnStyle}>×</button>
         </div>
 
         {error && <p style={errorStyle}>{error}</p>}
@@ -119,7 +119,7 @@ export default function CompanyForm({ company, onClose, onSaved }) {
             <label style={labelStyle}>Navn *<input name="name" value={form.name} onChange={handleChange} style={inputStyle} /></label>
             <label style={labelStyle}>Type
               <select name="type" value={form.type} onChange={handleChange} style={inputStyle}>
-                <option value="canvas">Canvas</option><option value="client">Klient</option>
+                <option value="canvas">Canvas</option><option value="client">Kunde</option><option value="former_client">Tidl. kunde</option>
               </select>
             </label>
             <label style={labelStyle}>Status

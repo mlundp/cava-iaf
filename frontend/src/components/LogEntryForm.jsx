@@ -70,7 +70,7 @@ export default function LogEntryForm({ onClose, onSaved }) {
       <div className="cava-modal" style={modalStyle} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Log aktivitet</h2>
-          <button onClick={onClose} style={closeBtnStyle}>\u00d7</button>
+          <button onClick={onClose} style={closeBtnStyle}>×</button>
         </div>
 
         {error && <p style={errorStyle}>{error}</p>}

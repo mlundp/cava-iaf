@@ -12,14 +12,15 @@ const statusColors = {
 };
 
 const typeStyles = {
-  client: { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0', label: 'Klient' },
+  client: { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0', label: 'Kunde' },
   canvas: { bg: '#faf5ff', color: '#7c3aed', border: '#ddd6fe', label: 'Canvas' },
+  former_client: { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0', label: 'Tidl. kunde' },
 };
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 const statusOrder = { hot: 0, warm: 1, cold: 2 };
-const typeOrder = { client: 0, canvas: 1 };
+const typeOrder = { client: 0, canvas: 1, former_client: 2 };
 
 export default function Kontakter() {
   const [companies, setCompanies] = useState([]);
@@ -171,7 +172,8 @@ export default function Kontakter() {
         <input type="text" placeholder="Søg efter navn..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={{ ...selectStyle, minWidth: 140 }}>
           <option value="">Alle typer</option>
-          <option value="client">Klient</option>
+          <option value="client">Kunde</option>
+          <option value="former_client">Tidl. kunde</option>
           <option value="canvas">Canvas</option>
         </select>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ ...selectStyle, minWidth: 140 }}>
