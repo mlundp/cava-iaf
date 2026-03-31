@@ -458,7 +458,7 @@ function LogEntryForm({ companyId, initial, onDone, onCancel }) {
         const res = await fetch(`${API_URL}/api/companies/${companyId}/log/${initial.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activity_type: form.activity_type, notes: form.notes.trim() || null, occurred_at: form.occurred_at, attachments }),
+          body: JSON.stringify({ activity_type: form.activity_type, notes: form.notes.trim() || null, occurred_at: new Date().toISOString(), attachments }),
         });
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.error || 'Ukendt fejl');
@@ -524,7 +524,7 @@ function LogEntryModal({ entry, companyId, onClose, onRefresh }) {
     <div style={overlayStyle} onClick={onClose}>
       <div style={logModalStyle} onClick={(e) => e.stopPropagation()}>
         {editing ? (
-          <LogEntryForm companyId={companyId} initial={entry} onDone={() => { setEditing(false); onRefresh(); onClose(); }} onCancel={() => setEditing(false)} />
+          <LogEntryForm companyId={companyId} initial={entry} onDone={() => { setEditing(false); onRefresh(); onClose(); }} onCancel={() => { setEditing(false); onClose(); }} />
         ) : (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
