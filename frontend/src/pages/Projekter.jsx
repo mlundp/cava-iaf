@@ -255,10 +255,41 @@ function ProjectFormModal({ companies, companyId, initial, onClose, onSaved }) {
     company_id: companyId || initial?.company_id || '',
   });
   const [saving, setSaving] = useState(false);
+  const [dineroLoading, setDineroLoading] = useState(false);
+  const [dineroInfo, setDineroInfo] = useState(null);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm((p) => ({ ...p, [name]: type === 'checkbox' ? checked : value }));
+  };
+
+  const translateStatus = (s) => {
+    if (s === 'Paid') return 'Betalt';
+    if (s === 'Booked') return 'Ikke betalt';
+    return s || '';
+  };
+
+  const fetchFromDinero = async () => {
+    const num = form.dinero_invoice_number.trim();
+    if (!num) return;
+    setDineroLoading(true);
+    setDineroInfo(null);
+    try {
+      const res = await fetch(`${API_URL}/api/dinero/invoice-by-number?number=${encodeURIComponent(num)}`);
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Ukendt fejl');
+      setForm((p) => ({
+        ...p,
+        dinero_invoice_guid: data.guid || '',
+        amount_dkk: data.amount || '',
+        client_paid: data.status === 'Paid',
+      }));
+      setDineroInfo(`Faktura ${num} — ${Number(data.amount || 0).toLocaleString('da-DK')} kr. — ${translateStatus(data.status)}`);
+    } catch (err) {
+      setDineroInfo(`Fejl: ${err.message}`);
+    } finally {
+      setDineroLoading(false);
+    }
   };
 
   const buildDate = (month, year) => {
@@ -343,8 +374,16 @@ function ProjectFormModal({ companies, companyId, initial, onClose, onSaved }) {
             <label style={labelStyle}>Omkostninger ex moms (DKK)<input name="cost_dkk" type="number" value={form.cost_dkk} onChange={handleChange} style={inputStyle} /></label>
             <label style={labelStyle}>Faktura sendt<input name="invoice_date" type="date" value={form.invoice_date} onChange={handleChange} style={inputStyle} /></label>
             <label style={labelStyle}>Bogføring år<input name="booking_year" type="number" min="2000" max="2099" value={form.booking_year} onChange={handleChange} style={inputStyle} placeholder="2026" /></label>
-            <label style={labelStyle}>Dinero faktura nr.<input name="dinero_invoice_number" value={form.dinero_invoice_number} onChange={handleChange} style={inputStyle} /></label>
-            <label style={labelStyle}>Dinero faktura GUID<input name="dinero_invoice_guid" value={form.dinero_invoice_guid} onChange={handleChange} style={inputStyle} /></label>
+            <div style={labelStyle}>Dinero faktura nr.
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input name="dinero_invoice_number" value={form.dinero_invoice_number} onChange={handleChange} style={{ ...inputStyle, flex: 1 }} />
+                <button type="button" onClick={fetchFromDinero} disabled={dineroLoading || !form.dinero_invoice_number.trim()} style={{ ...primaryBtnStyle, padding: '6px 12px', fontSize: 12, opacity: dineroLoading || !form.dinero_invoice_number.trim() ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                  {dineroLoading ? 'Henter...' : 'Hent fra Dinero'}
+                </button>
+              </div>
+              {dineroInfo && <span style={{ fontSize: 12, color: dineroInfo.startsWith('Fejl') ? '#dc2626' : 'var(--text-muted)', marginTop: 4 }}>{dineroInfo}</span>}
+            </div>
+            <div>{/* spacer */}</div>
           </div>
           <div style={{ display: 'flex', gap: 24, marginTop: 18 }}>
             <label style={checkboxLabelStyle}>
