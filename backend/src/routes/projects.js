@@ -37,7 +37,7 @@ async function getDineroAuthHeader() {
 }
 
 // Allowed columns that exist in the projects table
-const ALLOWED_FIELDS = ['name', 'description', 'status', 'start_date', 'deadline', 'amount_dkk', 'cost_dkk', 'dinero_invoice_number', 'dinero_invoice_guid', 'invoice_date', 'booking_year', 'invoiced', 'cost_paid', 'client_paid'];
+const ALLOWED_FIELDS = ['project_number', 'name', 'description', 'status', 'start_date', 'deadline', 'amount_dkk', 'cost_dkk', 'dinero_invoice_number', 'dinero_invoice_guid', 'invoice_date', 'booking_year', 'invoiced', 'cost_paid', 'client_paid'];
 
 function pickFields(body) {
   const result = {};
@@ -59,6 +59,33 @@ router.get('/', async (_req, res) => {
     res.json({ success: true, projects: data || [] });
   } catch (err) {
     console.error('[Projects] GET / error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/projects/next-number - get next auto-generated project number
+router.get('/next-number', async (_req, res) => {
+  try {
+    const db = getSupabase();
+    const { data: existing } = await db
+      .from('projects')
+      .select('project_number')
+      .not('project_number', 'is', null)
+      .order('project_number', { ascending: false });
+
+    let nextNum = 600;
+    if (existing && existing.length > 0) {
+      for (const p of existing) {
+        const match = p.project_number?.match(/^L(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num >= nextNum) nextNum = num + 1;
+        }
+      }
+    }
+    res.json({ success: true, project_number: `L${nextNum}` });
+  } catch (err) {
+    console.error('[Projects] GET /next-number error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -104,11 +131,13 @@ router.post('/company/:companyId', async (req, res) => {
       }
     }
 
-    const project_number = `L${nextNum}`;
+    const project_number = req.body.project_number?.trim() || `L${nextNum}`;
 
+    const fields = pickFields(req.body);
+    delete fields.project_number; // handled separately above
     const { data, error } = await db
       .from('projects')
-      .insert({ ...pickFields(req.body), company_id: companyId, project_number })
+      .insert({ ...fields, company_id: companyId, project_number })
       .select('*')
       .single();
     if (error) throw error;

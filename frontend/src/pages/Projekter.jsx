@@ -236,6 +236,7 @@ function ProjectFormModal({ companies, companyId, initial, onClose, onSaved }) {
   const startParsed = parseMonthYear(initial?.start_date);
   const deadlineParsed = parseMonthYear(initial?.deadline);
   const [form, setForm] = useState({
+    project_number: initial?.project_number || '',
     name: initial?.name || '',
     description: initial?.description || '',
     status: initial?.status || 'planlagt',
@@ -255,6 +256,15 @@ function ProjectFormModal({ companies, companyId, initial, onClose, onSaved }) {
     company_id: companyId || initial?.company_id || '',
   });
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isEdit && !form.project_number) {
+      fetch(`${API_URL}/api/projects/next-number`)
+        .then((r) => r.json())
+        .then((d) => { if (d.success) setForm((p) => ({ ...p, project_number: d.project_number })); })
+        .catch(() => {});
+    }
+  }, []);
   const [dineroLoading, setDineroLoading] = useState(false);
   const [dineroInfo, setDineroInfo] = useState(null);
 
@@ -303,6 +313,7 @@ function ProjectFormModal({ companies, companyId, initial, onClose, onSaved }) {
     setSaving(true);
     try {
       const payload = {
+        project_number: form.project_number.trim() || undefined,
         name: form.name.trim(),
         description: form.description.trim() || null,
         status: form.status,
@@ -354,6 +365,7 @@ function ProjectFormModal({ companies, companyId, initial, onClose, onSaved }) {
               </select>
             </label>
           )}
+          <label style={{ ...labelStyle, marginBottom: 14 }}>Projekt nr.<input name="project_number" value={form.project_number} onChange={handleChange} style={{ ...inputStyle, maxWidth: 160 }} /></label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <label style={labelStyle}>Beskrivelse (navn) *<input name="name" value={form.name} onChange={handleChange} style={inputStyle} required /></label>
             <label style={labelStyle}>Status
