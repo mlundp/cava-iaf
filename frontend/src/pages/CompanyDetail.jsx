@@ -861,6 +861,7 @@ function ProjectInlineForm({ companyId, initial, onDone, onCancel }) {
   const startParsed = cdParseMonthYear(initial?.start_date);
   const deadlineParsed = cdParseMonthYear(initial?.deadline);
   const [form, setForm] = useState({
+    project_number: initial?.project_number || '',
     name: initial?.name || '',
     description: initial?.description || '',
     status: initial?.status || 'planlagt',
@@ -879,6 +880,15 @@ function ProjectInlineForm({ companyId, initial, onDone, onCancel }) {
     client_paid: initial?.client_paid || false,
   });
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isEdit && !form.project_number) {
+      fetch(`${API_URL}/api/projects/next-number`)
+        .then((r) => r.json())
+        .then((d) => { if (d.success) setForm((p) => ({ ...p, project_number: d.project_number })); })
+        .catch(() => {});
+    }
+  }, []);
   const [dineroLoading, setDineroLoading] = useState(false);
   const [dineroInfo, setDineroInfo] = useState(null);
 
@@ -926,6 +936,7 @@ function ProjectInlineForm({ companyId, initial, onDone, onCancel }) {
     if (!form.name.trim()) return;
     setSaving(true);
     const payload = {
+      project_number: form.project_number.trim() || undefined,
       name: form.name.trim(),
       description: form.description.trim() || null,
       status: form.status,
@@ -960,6 +971,7 @@ function ProjectInlineForm({ companyId, initial, onDone, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} style={{ ...projectCardStyle, marginBottom: 4 }}>
+      <label style={{ ...contactEditLabelStyle, marginBottom: 14 }}>Projekt nr.<input name="project_number" value={form.project_number} onChange={handleChange} style={{ ...contactEditInputStyle, maxWidth: 160 }} /></label>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         <label style={contactEditLabelStyle}>Beskrivelse (navn) *<input name="name" value={form.name} onChange={handleChange} style={contactEditInputStyle} required /></label>
         <label style={contactEditLabelStyle}>Status
