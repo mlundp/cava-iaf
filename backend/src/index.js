@@ -5,6 +5,7 @@ import dineroRoutes from './routes/dinero.js';
 import cvrRoutes from './routes/cvr.js';
 import aiRoutes from './routes/ai.js';
 import companiesRoutes from './routes/companies.js';
+import projectsRoutes from './routes/projects.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -25,6 +26,7 @@ app.use('/api/dinero', dineroRoutes);
 app.use('/api/cvr', cvrRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/companies', companiesRoutes);
+app.use('/api/projects', projectsRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

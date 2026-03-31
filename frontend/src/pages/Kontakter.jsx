@@ -31,6 +31,7 @@ export default function Kontakter() {
   const [statusFilter, setStatusFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [activeProjects, setActiveProjects] = useState({});
   const [sortCol, setSortCol] = useState('latest_activity');
   const [sortDir, setSortDir] = useState('desc');
   const navigate = useNavigate();
@@ -58,7 +59,21 @@ export default function Kontakter() {
     }
   };
 
-  useEffect(() => { fetchCompanies(); fetchLatestActivity(); }, []);
+  const fetchActiveProjects = async () => {
+    const { data } = await supabase
+      .from('projects')
+      .select('company_id, status')
+      .in('status', ['planlagt', 'tilbud', 'igangværende']);
+    if (data) {
+      const map = {};
+      for (const row of data) {
+        map[row.company_id] = true;
+      }
+      setActiveProjects(map);
+    }
+  };
+
+  useEffect(() => { fetchCompanies(); fetchLatestActivity(); fetchActiveProjects(); }, []);
 
   const handleDineroSync = async () => {
     setSyncing(true);
@@ -222,7 +237,12 @@ export default function Kontakter() {
                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)')}
                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}
                   >
-                    <td style={tdStyle}><span style={{ fontWeight: 600, color: 'var(--text)' }}>{company.name}</span></td>
+                    <td style={tdStyle}>
+                      <span style={{ fontWeight: 600, color: 'var(--text)' }}>{company.name}</span>
+                      {activeProjects[company.id] && (
+                        <span style={{ marginLeft: 8, padding: '2px 7px', borderRadius: 20, fontSize: 10, fontWeight: 600, backgroundColor: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', verticalAlign: 'middle' }}>Projekt</span>
+                      )}
+                    </td>
                     <td style={tdStyle}>
                       <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, backgroundColor: ts.bg, color: ts.color, border: `1px solid ${ts.border}` }}>
                         {ts.label}

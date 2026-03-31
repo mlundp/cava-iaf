@@ -14,6 +14,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 const tabs = [
   { key: 'info', label: 'Info' },
   { key: 'kontakter', label: 'Kontakter' },
+  { key: 'projekter', label: 'Projekter' },
   { key: 'opslagstavlen', label: 'Opslagstavlen' },
 ];
 
@@ -54,6 +55,7 @@ export default function CompanyDetail() {
   const [company, setCompany] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [logEntries, setLogEntries] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showEditCompany, setShowEditCompany] = useState(false);
   const [showContactForm, setShowContactForm] = useState(false);
@@ -80,6 +82,15 @@ export default function CompanyDetail() {
       setLogEntries([]);
     }
   };
+  const fetchProjects = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/projects/company/${id}`);
+      const json = await res.json();
+      setProjects(json.projects || []);
+    } catch {
+      setProjects([]);
+    }
+  };
 
   useEffect(() => {
     const load = async () => { setLoading(true); await fetchCompany(); setLoading(false); };
@@ -89,6 +100,7 @@ export default function CompanyDetail() {
   useEffect(() => {
     if (!company) return;
     if (activeTab === 'kontakter') fetchContacts();
+    else if (activeTab === 'projekter') fetchProjects();
     else if (activeTab === 'opslagstavlen') fetchLogEntries();
   }, [activeTab, company]);
 
@@ -161,6 +173,7 @@ export default function CompanyDetail() {
         {activeTab === 'kontakter' && (
           <KontakterTab contacts={contacts} company={company} onAdd={() => { setEditingContact(null); setShowContactForm(true); }} onDelete={deleteContact} onPrefill={(prefill) => { setEditingContact(prefill); setShowContactForm(true); }} onRefresh={fetchContacts} />
         )}
+        {activeTab === 'projekter' && <ProjekterTab companyId={id} projects={projects} onRefresh={fetchProjects} />}
         {activeTab === 'opslagstavlen' && <OpslagstavlenTab companyId={id} entries={logEntries} onRefresh={fetchLogEntries} highlightEntryId={entryParam} />}
       </div>
 
@@ -704,6 +717,211 @@ function OpslagstavlenTab({ companyId, entries, onRefresh, highlightEntryId }) {
     </div>
   );
 }
+
+const projectStatusLabels = { planlagt: 'Planlagt', tilbud: 'Tilbud', igangværende: 'Igangværende', afsluttet: 'Afsluttet' };
+const projectStatusStyles = {
+  planlagt: { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' },
+  tilbud: { bg: '#fffbeb', color: '#d97706', border: '#fde68a' },
+  igangværende: { bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' },
+  afsluttet: { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0' },
+};
+
+function ProjekterTab({ companyId, projects, onRefresh }) {
+  const [showForm, setShowForm] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
+  const [syncingId, setSyncingId] = useState(null);
+  const [syncResult, setSyncResult] = useState({});
+
+  const deleteProject = async (projectId) => {
+    if (!window.confirm('Slet dette projekt?')) return;
+    try {
+      const res = await fetch(`${API_URL}/api/projects/${projectId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Ukendt fejl');
+      onRefresh();
+    } catch (err) {
+      alert(`Fejl: ${err.message}`);
+    }
+  };
+
+  const syncDinero = async (project) => {
+    setSyncingId(project.id);
+    try {
+      const res = await fetch(`${API_URL}/api/projects/${project.id}/sync-dinero`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Ukendt fejl');
+      setSyncResult((prev) => ({ ...prev, [project.id]: { status: data.status, amount: data.amount } }));
+    } catch (err) {
+      alert(`Fejl: ${err.message}`);
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
+  const saveEdit = async (projectId, form) => {
+    try {
+      const res = await fetch(`${API_URL}/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Ukendt fejl');
+      setEditingProject(null);
+      onRefresh();
+    } catch (err) {
+      alert(`Fejl: ${err.message}`);
+    }
+  };
+
+  const formatDate = (d) => !d ? '\u2014' : new Date(d).toLocaleDateString('da-DK');
+  const formatAmount = (a) => !a ? '\u2014' : Number(a).toLocaleString('da-DK') + ' kr.';
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Projekter</h3>
+        <button onClick={() => { setEditingProject(null); setShowForm(true); }} style={primaryBtnSmallStyle}>+ Nyt projekt</button>
+      </div>
+
+      {showForm && (
+        <ProjectInlineForm companyId={companyId} initial={null} onDone={() => { setShowForm(false); onRefresh(); }} onCancel={() => setShowForm(false)} />
+      )}
+
+      {projects.length === 0 && !showForm ? (
+        <p style={{ color: 'var(--text-faint)', fontSize: 14 }}>Ingen projekter endnu.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {projects.map((p) => {
+            const ss = projectStatusStyles[p.status] || projectStatusStyles.planlagt;
+            const sr = syncResult[p.id];
+
+            if (editingProject === p.id) {
+              return <ProjectInlineForm key={p.id} companyId={companyId} initial={p} onDone={() => { setEditingProject(null); onRefresh(); }} onCancel={() => setEditingProject(null)} />;
+            }
+
+            return (
+              <div key={p.id} style={projectCardStyle}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{p.project_number}</span>
+                      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{p.name}</span>
+                      <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, backgroundColor: ss.bg, color: ss.color, border: `1px solid ${ss.border}` }}>
+                        {projectStatusLabels[p.status] || p.status}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 20, fontSize: 13, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                      {p.start_date && <span>Start: {formatDate(p.start_date)}</span>}
+                      {p.deadline && <span>Deadline: {formatDate(p.deadline)}</span>}
+                      {p.amount_dkk && <span>Beløb: {formatAmount(p.amount_dkk)}</span>}
+                      {p.dinero_invoice_number && <span>Faktura: {p.dinero_invoice_number}</span>}
+                    </div>
+                    {sr && (
+                      <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-muted)' }}>
+                        Dinero status: <strong>{sr.status}</strong>{sr.amount != null ? ` — ${Number(sr.amount).toLocaleString('da-DK')} kr.` : ''}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    {p.dinero_invoice_guid && (
+                      <button onClick={() => syncDinero(p)} disabled={syncingId === p.id} style={{ ...actionBtnStyle, fontSize: 12 }}>
+                        {syncingId === p.id ? 'Syncer...' : 'Sync Dinero'}
+                      </button>
+                    )}
+                    <button onClick={() => setEditingProject(p.id)} style={actionBtnStyle}>Rediger</button>
+                    <button onClick={() => deleteProject(p.id)} style={{ ...actionBtnStyle, color: '#ef4444' }}>Slet</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProjectInlineForm({ companyId, initial, onDone, onCancel }) {
+  const isEdit = !!initial?.id;
+  const [form, setForm] = useState({
+    name: initial?.name || '',
+    description: initial?.description || '',
+    status: initial?.status || 'planlagt',
+    start_date: initial?.start_date || '',
+    deadline: initial?.deadline || '',
+    amount_dkk: initial?.amount_dkk || '',
+    dinero_invoice_number: initial?.dinero_invoice_number || '',
+    dinero_invoice_guid: initial?.dinero_invoice_guid || '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((p) => ({ ...p, [name]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim()) return;
+    setSaving(true);
+    const payload = {
+      name: form.name.trim(),
+      description: form.description.trim() || null,
+      status: form.status,
+      start_date: form.start_date || null,
+      deadline: form.deadline || null,
+      amount_dkk: form.amount_dkk ? Number(form.amount_dkk) : null,
+      dinero_invoice_number: form.dinero_invoice_number.trim() || null,
+      dinero_invoice_guid: form.dinero_invoice_guid.trim() || null,
+    };
+    try {
+      let res;
+      if (isEdit) {
+        res = await fetch(`${API_URL}/api/projects/${initial.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      } else {
+        res = await fetch(`${API_URL}/api/projects/company/${companyId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      }
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Ukendt fejl');
+      onDone();
+    } catch (err) {
+      alert(`Fejl: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} style={{ ...projectCardStyle, marginBottom: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <label style={contactEditLabelStyle}>Navn *<input name="name" value={form.name} onChange={handleChange} style={contactEditInputStyle} required /></label>
+        <label style={contactEditLabelStyle}>Status
+          <select name="status" value={form.status} onChange={handleChange} style={contactEditInputStyle}>
+            <option value="planlagt">Planlagt</option>
+            <option value="tilbud">Tilbud</option>
+            <option value="igangværende">Igangværende</option>
+            <option value="afsluttet">Afsluttet</option>
+          </select>
+        </label>
+        <label style={contactEditLabelStyle}>Startdato<input name="start_date" type="date" value={form.start_date} onChange={handleChange} style={contactEditInputStyle} /></label>
+        <label style={contactEditLabelStyle}>Deadline<input name="deadline" type="date" value={form.deadline} onChange={handleChange} style={contactEditInputStyle} /></label>
+        <label style={contactEditLabelStyle}>Beløb (DKK)<input name="amount_dkk" type="number" value={form.amount_dkk} onChange={handleChange} style={contactEditInputStyle} /></label>
+        <label style={contactEditLabelStyle}>Dinero faktura nr.<input name="dinero_invoice_number" value={form.dinero_invoice_number} onChange={handleChange} style={contactEditInputStyle} /></label>
+      </div>
+      <label style={{ ...contactEditLabelStyle, marginTop: 14 }}>Dinero faktura GUID<input name="dinero_invoice_guid" value={form.dinero_invoice_guid} onChange={handleChange} style={contactEditInputStyle} /></label>
+      <label style={{ ...contactEditLabelStyle, marginTop: 14 }}>Beskrivelse
+        <textarea name="description" value={form.description} onChange={handleChange} rows={2} style={{ ...contactEditInputStyle, resize: 'vertical' }} />
+      </label>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+        <button type="button" onClick={onCancel} style={{ ...secondaryBtnStyle, padding: '6px 14px', fontSize: 12 }}>Annuller</button>
+        <button type="submit" disabled={saving} style={{ ...primaryBtnSmallStyle, opacity: saving ? 0.7 : 1 }}>{saving ? 'Gemmer...' : isEdit ? 'Gem' : 'Opret'}</button>
+      </div>
+    </form>
+  );
+}
+
+const projectCardStyle = { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
 
 const cardStyle = { backgroundColor: 'var(--bg-card)', borderRadius: 12, padding: 24, boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-card)', transition: 'background-color 0.2s ease' };
 const secondaryBtnStyle = { backgroundColor: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border)', padding: '9px 18px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', transition: 'all 0.15s ease' };
