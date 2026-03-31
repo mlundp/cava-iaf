@@ -24,8 +24,9 @@ const statusColors = {
 };
 
 const typeStyles = {
-  client: { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0', label: 'Klient' },
+  client: { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0', label: 'Kunde' },
   canvas: { bg: '#faf5ff', color: '#7c3aed', border: '#ddd6fe', label: 'Canvas' },
+  former_client: { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0', label: 'Tidl. kunde' },
 };
 
 const activityLabels = {
