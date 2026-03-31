@@ -371,6 +371,52 @@ router.get('/contacts/:contactGuid', async (req, res) => {
   }
 });
 
+// GET /api/dinero/invoice-by-number?number=318
+router.get('/invoice-by-number', async (req, res) => {
+  try {
+    const { number } = req.query;
+    if (!number) return res.status(400).json({ success: false, error: 'Mangler faktura nummer' });
+
+    const authHeader = await getDineroAuthHeader();
+    console.log('[InvoiceByNumber] Searching for invoice number:', number);
+
+    const allInvoices = await fetchAllPages(authHeader, '/invoices');
+    const searchNum = String(number).trim();
+    const match = allInvoices.find((inv) => {
+      const num = String(inv.Number ?? inv.number ?? '');
+      const desc = String(inv.Description ?? inv.description ?? '');
+      return num === searchNum || desc === searchNum;
+    });
+
+    if (!match) {
+      return res.status(404).json({ success: false, error: `Faktura ${searchNum} ikke fundet i Dinero` });
+    }
+
+    const invoiceGuid = match.Guid || match.guid;
+    console.log('[InvoiceByNumber] Found invoice guid:', invoiceGuid);
+
+    const detailRes = await axios.get(
+      `${DINERO_BASE}/${DINERO_ORG_ID}/invoices/${invoiceGuid}`,
+      { headers: { 'Authorization': authHeader } }
+    );
+    const detail = detailRes.data;
+
+    res.json({
+      success: true,
+      guid: invoiceGuid,
+      amount: detail.TotalExclVat || 0,
+      status: detail.Status || detail.status || '',
+      contact_name: detail.ContactName || match.ContactName || '',
+    });
+  } catch (err) {
+    console.error('[InvoiceByNumber] ERROR:', err.message);
+    const detail = err.response?.data;
+    const errorMsg = typeof detail === 'string' ? detail
+      : detail?.message || detail?.error_description || detail?.error || err.message;
+    res.status(500).json({ success: false, error: errorMsg });
+  }
+});
+
 // GET /api/dinero/status
 router.get('/status', (_req, res) => {
   res.json({
