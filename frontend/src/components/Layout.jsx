@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../lib/theme';
-import { IconContacts, IconLog, IconAI, IconSun, IconMoon } from './Icons';
+import { IconContacts, IconLog, IconProjects, IconAI, IconSun, IconMoon } from './Icons';
 
 const navItems = [
   { to: '/kontakter', label: 'Kontakter', Icon: IconContacts },
   { to: '/logbog', label: 'Logbog', Icon: IconLog },
+  { to: '/projekter', label: 'Projekter', Icon: IconProjects },
   { to: '/medhjælperen', label: 'Medhjælperen', Icon: IconAI },
 ];
 

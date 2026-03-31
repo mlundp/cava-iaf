@@ -33,15 +33,21 @@ router.post('/tasks', async (_req, res) => {
     const claude = getAnthropic();
 
     // Fetch CRM data
-    const [companiesRes, contactsRes, logsRes] = await Promise.all([
+    const [companiesRes, contactsRes, logsRes, activeProjectsRes] = await Promise.all([
       db.from('companies').select('*').order('name'),
       db.from('contacts').select('*').order('name'),
       db.from('log_entries').select('*, companies(name), contacts(name)').order('occurred_at', { ascending: false }),
+      db.from('projects').select('company_id').in('status', ['planlagt', 'tilbud', 'igangværende']),
     ]);
 
     const allCompanies = companiesRes.data || [];
     const contacts = contactsRes.data || [];
     const logs = logsRes.data || [];
+
+    // Build set of company IDs with active projects
+    const activeProjectCompanyIds = new Set(
+      (activeProjectsRes.data || []).map((p) => p.company_id)
+    );
 
     if (allCompanies.length === 0) {
       return res.status(400).json({ error: 'Ingen virksomheder i CRM — kan ikke generere opgaver.' });
@@ -71,6 +77,9 @@ router.post('/tasks', async (_req, res) => {
 
         // Exclude companies with activity in the last 14 days
         if (daysSinceActivity < 14) return null;
+
+        // Exclude companies with active projects (planlagt, tilbud, igangværende)
+        if (activeProjectCompanyIds.has(c.id)) return null;
 
         // Score by priority
         let score = 0;

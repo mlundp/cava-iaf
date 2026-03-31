@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Kontakter from './pages/Kontakter';
 import CompanyDetail from './pages/CompanyDetail';
 import Logbog from './pages/Logbog';
+import Projekter from './pages/Projekter';
 import Medhjælperen from './pages/Medhjælperen';
 
 export default function App() {
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="/kontakter" element={<Kontakter />} />
         <Route path="/kontakter/:id" element={<CompanyDetail />} />
         <Route path="/logbog" element={<Logbog />} />
+        <Route path="/projekter" element={<Projekter />} />
         <Route path="/medhjælperen" element={<Medhjælperen />} />
         <Route path="*" element={<Navigate to="/kontakter" replace />} />
       </Routes>
