@@ -799,8 +799,8 @@ function ProjekterTab({ companyId, projects, onRefresh }) {
                       </span>
                     </div>
                     <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-                      {p.start_date && <span>Start: {formatDate(p.start_date)}</span>}
-                      {p.deadline && <span>Deadline: {formatDate(p.deadline)}</span>}
+                      {p.start_date && <span>Projekt start: {cdFormatMonthYear(p.start_date)}</span>}
+                      {p.deadline && <span>Projekt slut: {cdFormatMonthYear(p.deadline)}</span>}
                       {p.booking_year && <span>Bogføring: {p.booking_year}</span>}
                       {p.invoice_date && <span>Faktura sendt: {formatDate(p.invoice_date)}</span>}
                       {p.dinero_invoice_number && <span>Faktura: {p.dinero_invoice_number}</span>}
@@ -841,14 +841,33 @@ function ProjekterTab({ companyId, projects, onRefresh }) {
   );
 }
 
+const CD_MONTHS = ['Januar', 'Februar', 'Marts', 'April', 'Maj', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'December'];
+const CD_YEARS = Array.from({ length: 11 }, (_, i) => 2020 + i);
+
+function cdParseMonthYear(dateStr) {
+  if (!dateStr) return { month: '', year: '' };
+  const d = new Date(dateStr);
+  return { month: String(d.getMonth()), year: String(d.getFullYear()) };
+}
+
+function cdFormatMonthYear(dateStr) {
+  if (!dateStr) return '\u2014';
+  const d = new Date(dateStr);
+  return `${CD_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
 function ProjectInlineForm({ companyId, initial, onDone, onCancel }) {
   const isEdit = !!initial?.id;
+  const startParsed = cdParseMonthYear(initial?.start_date);
+  const deadlineParsed = cdParseMonthYear(initial?.deadline);
   const [form, setForm] = useState({
     name: initial?.name || '',
     description: initial?.description || '',
     status: initial?.status || 'planlagt',
-    start_date: initial?.start_date || '',
-    deadline: initial?.deadline || '',
+    start_month: startParsed.month,
+    start_year: startParsed.year,
+    deadline_month: deadlineParsed.month,
+    deadline_year: deadlineParsed.year,
     amount_dkk: initial?.amount_dkk || '',
     cost_dkk: initial?.cost_dkk || '',
     dinero_invoice_number: initial?.dinero_invoice_number || '',
@@ -866,6 +885,11 @@ function ProjectInlineForm({ companyId, initial, onDone, onCancel }) {
     setForm((p) => ({ ...p, [name]: type === 'checkbox' ? checked : value }));
   };
 
+  const buildDate = (month, year) => {
+    if (month === '' || year === '') return null;
+    return `${year}-${String(Number(month) + 1).padStart(2, '0')}-01`;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) return;
@@ -874,8 +898,8 @@ function ProjectInlineForm({ companyId, initial, onDone, onCancel }) {
       name: form.name.trim(),
       description: form.description.trim() || null,
       status: form.status,
-      start_date: form.start_date || null,
-      deadline: form.deadline || null,
+      start_date: buildDate(form.start_month, form.start_year),
+      deadline: buildDate(form.deadline_month, form.deadline_year),
       amount_dkk: form.amount_dkk ? Number(form.amount_dkk) : null,
       cost_dkk: form.cost_dkk ? Number(form.cost_dkk) : null,
       dinero_invoice_number: form.dinero_invoice_number.trim() || null,
@@ -915,8 +939,30 @@ function ProjectInlineForm({ companyId, initial, onDone, onCancel }) {
             <option value="afsluttet">Afsluttet</option>
           </select>
         </label>
-        <label style={contactEditLabelStyle}>Startdato<input name="start_date" type="date" value={form.start_date} onChange={handleChange} style={contactEditInputStyle} /></label>
-        <label style={contactEditLabelStyle}>Deadline<input name="deadline" type="date" value={form.deadline} onChange={handleChange} style={contactEditInputStyle} /></label>
+        <div style={contactEditLabelStyle}>Projekt start
+          <div style={{ display: 'flex', gap: 8 }}>
+            <select value={form.start_month} onChange={(e) => setForm((p) => ({ ...p, start_month: e.target.value }))} style={{ ...contactEditInputStyle, flex: 1 }}>
+              <option value="">Måned</option>
+              {CD_MONTHS.map((m, i) => <option key={i} value={String(i)}>{m}</option>)}
+            </select>
+            <select value={form.start_year} onChange={(e) => setForm((p) => ({ ...p, start_year: e.target.value }))} style={{ ...contactEditInputStyle, width: 90 }}>
+              <option value="">År</option>
+              {CD_YEARS.map((y) => <option key={y} value={String(y)}>{y}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={contactEditLabelStyle}>Projekt slut
+          <div style={{ display: 'flex', gap: 8 }}>
+            <select value={form.deadline_month} onChange={(e) => setForm((p) => ({ ...p, deadline_month: e.target.value }))} style={{ ...contactEditInputStyle, flex: 1 }}>
+              <option value="">Måned</option>
+              {CD_MONTHS.map((m, i) => <option key={i} value={String(i)}>{m}</option>)}
+            </select>
+            <select value={form.deadline_year} onChange={(e) => setForm((p) => ({ ...p, deadline_year: e.target.value }))} style={{ ...contactEditInputStyle, width: 90 }}>
+              <option value="">År</option>
+              {CD_YEARS.map((y) => <option key={y} value={String(y)}>{y}</option>)}
+            </select>
+          </div>
+        </div>
         <label style={contactEditLabelStyle}>Salg ex moms (DKK)<input name="amount_dkk" type="number" value={form.amount_dkk} onChange={handleChange} style={contactEditInputStyle} /></label>
         <label style={contactEditLabelStyle}>Omkostninger ex moms (DKK)<input name="cost_dkk" type="number" value={form.cost_dkk} onChange={handleChange} style={contactEditInputStyle} /></label>
         <label style={contactEditLabelStyle}>Faktura sendt<input name="invoice_date" type="date" value={form.invoice_date} onChange={handleChange} style={contactEditInputStyle} /></label>

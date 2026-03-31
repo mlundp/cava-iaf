@@ -22,6 +22,39 @@ const statusStyles = {
 
 const CURRENT_YEAR = new Date().getFullYear();
 
+const MONTHS = ['Januar', 'Februar', 'Marts', 'April', 'Maj', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'December'];
+const YEARS = Array.from({ length: 11 }, (_, i) => 2020 + i);
+
+function parseMonthYear(dateStr) {
+  if (!dateStr) return { month: '', year: '' };
+  const d = new Date(dateStr);
+  return { month: String(d.getMonth()), year: String(d.getFullYear()) };
+}
+
+function formatMonthYear(dateStr) {
+  if (!dateStr) return '\u2014';
+  const d = new Date(dateStr);
+  return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function MonthYearPicker({ label, month, year, onMonthChange, onYearChange, style }) {
+  return (
+    <div style={{ ...style }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 5 }}>{label}</div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <select value={month} onChange={onMonthChange} style={{ ...pickerSelectStyle, flex: 1 }}>
+          <option value="">Måned</option>
+          {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
+        </select>
+        <select value={year} onChange={onYearChange} style={{ ...pickerSelectStyle, width: 90 }}>
+          <option value="">År</option>
+          {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </div>
+    </div>
+  );
+}
+
 function calcBrutto(p) {
   const sale = Number(p.amount_dkk) || 0;
   const cost = Number(p.cost_dkk) || 0;
@@ -200,12 +233,16 @@ export default function Projekter() {
 
 function ProjectFormModal({ companies, companyId, initial, onClose, onSaved }) {
   const isEdit = !!initial?.id;
+  const startParsed = parseMonthYear(initial?.start_date);
+  const deadlineParsed = parseMonthYear(initial?.deadline);
   const [form, setForm] = useState({
     name: initial?.name || '',
     description: initial?.description || '',
     status: initial?.status || 'planlagt',
-    start_date: initial?.start_date || '',
-    deadline: initial?.deadline || '',
+    start_month: startParsed.month,
+    start_year: startParsed.year,
+    deadline_month: deadlineParsed.month,
+    deadline_year: deadlineParsed.year,
     amount_dkk: initial?.amount_dkk || '',
     cost_dkk: initial?.cost_dkk || '',
     dinero_invoice_number: initial?.dinero_invoice_number || '',
@@ -224,6 +261,11 @@ function ProjectFormModal({ companies, companyId, initial, onClose, onSaved }) {
     setForm((p) => ({ ...p, [name]: type === 'checkbox' ? checked : value }));
   };
 
+  const buildDate = (month, year) => {
+    if (month === '' || year === '') return null;
+    return `${year}-${String(Number(month) + 1).padStart(2, '0')}-01`;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim() || !form.company_id) return;
@@ -233,8 +275,8 @@ function ProjectFormModal({ companies, companyId, initial, onClose, onSaved }) {
         name: form.name.trim(),
         description: form.description.trim() || null,
         status: form.status,
-        start_date: form.start_date || null,
-        deadline: form.deadline || null,
+        start_date: buildDate(form.start_month, form.start_year),
+        deadline: buildDate(form.deadline_month, form.deadline_year),
         amount_dkk: form.amount_dkk ? Number(form.amount_dkk) : null,
         cost_dkk: form.cost_dkk ? Number(form.cost_dkk) : null,
         dinero_invoice_number: form.dinero_invoice_number.trim() || null,
@@ -291,8 +333,12 @@ function ProjectFormModal({ companies, companyId, initial, onClose, onSaved }) {
                 <option value="afsluttet">Afsluttet</option>
               </select>
             </label>
-            <label style={labelStyle}>Startdato<input name="start_date" type="date" value={form.start_date} onChange={handleChange} style={inputStyle} /></label>
-            <label style={labelStyle}>Deadline<input name="deadline" type="date" value={form.deadline} onChange={handleChange} style={inputStyle} /></label>
+            <MonthYearPicker label="Projekt start" month={form.start_month} year={form.start_year}
+              onMonthChange={(e) => setForm((p) => ({ ...p, start_month: e.target.value }))}
+              onYearChange={(e) => setForm((p) => ({ ...p, start_year: e.target.value }))} />
+            <MonthYearPicker label="Projekt slut" month={form.deadline_month} year={form.deadline_year}
+              onMonthChange={(e) => setForm((p) => ({ ...p, deadline_month: e.target.value }))}
+              onYearChange={(e) => setForm((p) => ({ ...p, deadline_year: e.target.value }))} />
             <label style={labelStyle}>Salg ex moms (DKK)<input name="amount_dkk" type="number" value={form.amount_dkk} onChange={handleChange} style={inputStyle} /></label>
             <label style={labelStyle}>Omkostninger ex moms (DKK)<input name="cost_dkk" type="number" value={form.cost_dkk} onChange={handleChange} style={inputStyle} /></label>
             <label style={labelStyle}>Faktura sendt<input name="invoice_date" type="date" value={form.invoice_date} onChange={handleChange} style={inputStyle} /></label>
@@ -343,3 +389,4 @@ const labelStyle = { display: 'flex', flexDirection: 'column', fontSize: 12, fon
 const inputStyle = { padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 7, fontSize: 13, outline: 'none', fontFamily: 'inherit', color: 'var(--text)', backgroundColor: 'var(--bg-input)' };
 const checkboxLabelStyle = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', cursor: 'pointer' };
 const checkboxStyle = { width: 16, height: 16, accentColor: 'var(--accent)', cursor: 'pointer' };
+const pickerSelectStyle = { padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 7, fontSize: 13, fontFamily: 'inherit', color: 'var(--text)', backgroundColor: 'var(--bg-input)', cursor: 'pointer' };
